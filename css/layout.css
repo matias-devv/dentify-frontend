@@ -1,0 +1,88 @@
+/* ==========================================================================
+   DENTIFY — Layout
+   Asymmetric editorial split-screen: 55% form / 45% brand panel
+   ========================================================================== */
+
+/* ── Root layout container ─────────────────────────────────────────────── */
+.login-page {
+  display: grid;
+  grid-template-columns: var(--layout-form-width) var(--layout-panel-width);
+  min-height: 100dvh;
+  width: 100%;
+}
+
+/* ── Left: Form column ─────────────────────────────────────────────────── */
+.login-page__form-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: var(--color-surface);
+  padding: var(--space-12) var(--space-16);
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Right: Brand panel column ─────────────────────────────────────────── */
+.login-page__brand-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background-color: var(--color-panel);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Form content centering ────────────────────────────────────────────── */
+.login-page__form-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: var(--layout-max-form-content);
+  margin: 0 auto;
+}
+
+/* ── Logo area (top of form column) ───────────────────────────────────── */
+.login-page__logo-area {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ── Footer area (bottom of form column) ──────────────────────────────── */
+.login-page__form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+}
+
+/* ── Responsive: collapse to single column on tablet/mobile ─────────────── */
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-page__brand-col {
+    grid-row: 1;
+    min-height: 40dvh;
+    justify-content: center;
+  }
+
+  .login-page__form-col {
+    grid-row: 2;
+    padding: var(--space-10) var(--space-8);
+  }
+}
+
+@media (max-width: 560px) {
+  .login-page__form-col {
+    padding: var(--space-8) var(--space-6);
+  }
+
+  .login-page__brand-col {
+    min-height: 32dvh;
+  }
+}

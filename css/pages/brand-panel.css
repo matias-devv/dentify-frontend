@@ -1,0 +1,226 @@
+/* ==========================================================================
+   DENTIFY — Brand Panel Component
+   Right deep-blue panel: hero message, animated line, brand details
+   ========================================================================== */
+
+/* ── Panel outer container ─────────────────────────────────────────────── */
+.brand-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-12) var(--space-10);
+  background-color: var(--color-panel);
+  overflow: hidden;
+}
+
+/* ── Background texture: single gentle linear depth — medical, not fintech ── */
+.brand-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025) 0%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── All content above background ──────────────────────────────────────── */
+.brand-panel__top,
+.brand-panel__bottom,
+.brand-panel__line-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Top area: brand tagline ───────────────────────────────────────────── */
+.brand-panel__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.brand-panel__label {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  color: var(--color-panel-text-muted);
+}
+
+/* ── Hero headline ─────────────────────────────────────────────────────── */
+.brand-panel__headline {
+  font-family: var(--font-display);
+  font-size: clamp(var(--font-size-3xl), 4.5vw, var(--font-size-hero));
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-panel-text);
+  max-width: 10ch;
+}
+
+.brand-panel__headline em {
+  font-style: italic;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-vivid);
+}
+
+/* ── Sub-line ──────────────────────────────────────────────────────────── */
+.brand-panel__subline {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-panel-text-muted);
+  max-width: 32ch; 
+  margin-top: var(--space-4);
+}
+
+/* ── Animated divider / accent line ────────────────────────────────────── */
+.brand-panel__line-container {
+  margin: var(--space-12) 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.brand-panel__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+.brand-panel__divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-panel-line);
+  opacity: 0.3;
+}
+
+.brand-panel__divider-icon {
+  width: 36px;
+  height: 44px;
+  color: var(--color-accent-vivid);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.brand-panel__line-svg {
+  height: 50px;
+}
+
+.brand-panel__line-path {
+  stroke: var(--color-panel-line);
+  stroke-width: 1;
+  fill: none;
+  stroke-linecap: round;
+  /* JS will set strokeDasharray and strokeDashoffset */
+  transition: none;
+}
+
+/* ── Bottom area: stats / trust signals ────────────────────────────────── */
+.brand-panel__bottom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.brand-panel__stats {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-10);
+  align-items: flex-end;    
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.stat--primary .stat__number {
+  font-size: var(--font-size-3xl);
+}
+
+.stat--primary .stat__label {
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--letter-spacing-snug);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);       
+}
+
+.stat__number {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-panel-text);
+  line-height: 1;
+}
+
+.stat__label {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-panel-text-muted);
+}
+
+/* ── Panel security / compliance badge ────────────────────────────────── */
+.brand-panel__badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md); 
+  width: fit-content;
+}
+
+.brand-panel__badge-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-panel-text-muted);
+  flex-shrink: 0;
+}
+
+.brand-panel__badge-text {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-panel-text-muted);
+  text-transform: uppercase;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .brand-panel {
+    padding: var(--space-10) var(--space-8);
+    justify-content: center;
+  }
+
+  .brand-panel__headline {
+    font-size: clamp(var(--font-size-2xl), 6vw, var(--font-size-3xl));
+    max-width: 100%;
+  }
+
+  .brand-panel__line-container {
+    margin: var(--space-8) 0;
+    flex: unset;
+  }
+
+  .brand-panel__bottom {
+    display: none;
+  }
+}

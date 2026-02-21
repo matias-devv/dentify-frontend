@@ -1,0 +1,384 @@
+/* ==========================================================================
+   DENTIFY — Login Form Component
+   Form container, logo, labels/inputs, CTA, error states, focus treatments
+   ========================================================================== */
+
+/* ── Logo / Wordmark ───────────────────────────────────────────────────── */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+}
+
+.logo__mark {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.logo__wordmark {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-snug);
+  color: var(--color-ink);
+  line-height: 1;
+}
+
+/* ── Form header ───────────────────────────────────────────────────────── */
+/* space-14 (56px) below header = strong editorial zone before interactive fields.
+   Clinical hierarchy: title zone and form zone must breathe apart. */
+.login-form__header {
+  margin-bottom: var(--space-14);
+}
+
+.login-form__greeting {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  margin-bottom: var(--space-2);
+}
+
+.login-form__title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-ink);
+  line-height: var(--line-height-snug);
+}
+
+/* ── Form element ──────────────────────────────────────────────────────── */
+.login-form {
+  width: 100%;
+}
+ 
+.login-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
+  border: none;         
+   padding: var(--space-8) var(--space-8);       
+  margin-inline: 0;     
+  min-width: 0;        
+
+   /* ← contenedor sutil */
+  background-color: rgba(255, 255, 255, 0.72);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Field group: label + input + error ────────────────────────────────── */
+/* No outer border, no padding-left — field is transparent, not boxed.
+   Only the input itself carries border/focus signals. gap: space-3 (12px)
+   between label and input is generous without losing association. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: relative;
+}
+
+/* Label: restrained idle state (muted, wide tracking, 0.7 opacity).
+   On focus-within: shifts to accent color, full opacity, tighter tracking.
+   Communicates activation without aggression. */
+.field__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  opacity: 0.7;
+  transition:
+    color var(--transition-base),
+    opacity var(--transition-base),
+    letter-spacing var(--transition-base);
+}
+
+.field:focus-within .field__label {
+  color: var(--color-accent);
+  opacity: 1;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.field__input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Input: micro-depth via inset shadow + warm background tint.
+   Full border treatment, radius-lg = refined, not boxy.
+   On focus: border-left becomes accent (2px) as directional signal,
+   outer glow stays soft (accent-subtle, 3px), background lifts to white. */
+.field__input {
+  width: 100%;
+  height: var(--layout-input-height);
+  padding: 0 var(--space-4);
+  background-color: var(--color-surface-subtle);
+  border: 1px solid #E0DFDC;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-light);
+  color: var(--color-ink);
+  transition:
+    border-color var(--transition-base),
+    border-left-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background-color var(--transition-fast);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.field__input::placeholder {
+  color: var(--color-ink-placeholder);
+  font-weight: var(--font-weight-light);
+}
+
+.field__input:hover:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--color-ink-muted);
+}
+
+/* Focus: left border becomes accent (directional, not aggressive).
+   Outer glow at 3px = soft halo, not neon ring.
+   Inset shadow softens on activation. Background lifts to pure surface. */
+.field__input:focus,
+.field__input:focus-visible {
+  outline: none;
+  border-color: var(--color-border-focus);
+  border-left: 2px solid var(--color-accent);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.02),
+    0 0 0 3px var(--color-accent-subtle);
+  background-color: var(--color-surface);
+}
+
+/* Error state: contained to input only. Red border, warm error tint.
+   Error glow on focus is red at low opacity — not alarming, just clear. */
+.field__input[aria-invalid="true"] {
+  border-color: var(--color-border-error);
+  background-color: var(--color-error-bg);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.field__input[aria-invalid="true"]:focus {
+  outline: none;
+  border-left: 2px solid var(--color-border-error);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.02),
+    0 0 0 3px rgba(192, 57, 43, 0.12);
+}
+
+/* ── Password input with toggle ────────────────────────────────────────── */
+.field__input--password {
+  padding-right: var(--space-12);
+}
+
+.field__toggle-btn {
+  position: absolute;
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-ink-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.field__toggle-btn:hover {
+  color: var(--color-ink-secondary);
+}
+
+.field__toggle-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.field__toggle-btn svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  pointer-events: none;
+}
+
+/* ── Error message ─────────────────────────────────────────────────────── */
+.field__error {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-error);
+  letter-spacing: var(--letter-spacing-normal);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1rem;
+  margin-top: var(--space-1);
+}
+
+.field__error:empty {
+  display: none;
+}
+
+/* ── Form actions row (forgot link) ────────────────────────────────────── */
+/* Pulled close to password field via negative margin-top.
+   xs, muted, right-aligned — never competes with CTA.
+   Hover: accent color + full opacity. Padding for accessible click area. */
+.login-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(var(--space-4) * -1);
+  margin-bottom: var(--space-10);
+}
+
+.link--subtle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-ink-muted);
+  text-decoration: none;
+  letter-spacing: var(--letter-spacing-normal);
+  opacity: 0.8;
+  transition:
+    color var(--transition-base),
+    opacity var(--transition-base);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+}
+
+.link--subtle:hover {
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+.link--subtle:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+
+/* ── CTA Button ────────────────────────────────────────────────────────── */
+/* Deep panel blue (--color-panel) = institutional bridge to brand column.
+   Not generic accent — visual continuity across the split-screen.
+   54px height = authoritative, not minimalist.
+   Hover: brightness +18% + lift + shadow. No gradients. Confidence via flatness. */
+.btn-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3.375rem;
+  padding: 0 var(--space-8);
+  background-color: var(--color-panel);
+  color: var(--color-cta-text);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    filter var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.btn-cta:hover:not(:disabled) {
+  filter: brightness(1.18);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-cta:active:not(:disabled) {
+  filter: brightness(1.0);
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-cta:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+
+.btn-cta__icon {
+  display: flex;
+  align-items: center;
+  transition: transform var(--transition-base);
+}
+
+.btn-cta:hover:not(:disabled) .btn-cta__icon {
+  transform: translateX(3px);
+}
+
+.btn-cta__icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ── Loading / disabled states ─────────────────────────────────────────── */
+.btn-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.btn-cta[aria-busy="true"] {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.btn-cta[aria-busy="true"] .btn-cta__text::after {
+  content: '…';
+}
+
+/* ── Form footer ───────────────────────────────────────────────────────── */
+/* Institutional separator signals form closure.
+   xs, muted, normal tracking = recessive but present.
+   space-8 padding-top ensures the separator has air above it. */
+.form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-8);
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.form-footer__copy {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-muted);
+  letter-spacing: var(--letter-spacing-normal);
+}
+
+.form-footer__link {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-muted);
+  letter-spacing: var(--letter-spacing-normal);
+  text-decoration: none;
+  transition: color var(--transition-base);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+}
+
+.form-footer__link:hover {
+  color: var(--color-accent);
+}
+
+.form-footer__link:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+}

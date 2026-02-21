@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es-AR" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Accedé a Dentify — la plataforma de gestión clínica para profesionales de la odontología." />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <title>Acceso — Dentify</title>
+
+  <!-- Preconnect to Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Design system -->
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/pages/login-form.css" />
+  <link rel="stylesheet" href="css/pages/brand-panel.css" />
+</head>
+
+<body>
+  <!-- ── Skip navigation link (accessibility) ─────────────────────────── -->
+  <a class="visually-hidden" href="#login-form">Skip to login form</a>
+
+  <main class="login-page" aria-label="Acceso a Dentify">
+    <!-- ══════════════════════════════════════════════════════════════════
+         LEFT COLUMN — Form panel
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section class="login-page__form-col" aria-label="Formulario de acceso">
+      <!-- Logo -->
+      <header class="login-page__logo-area">
+        <a href="/" class="logo" aria-label="Dentify — ir al inicio">
+          <svg class="logo__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+            <rect width="32" height="32" rx="4" fill="#0B1D2E" />
+            <!-- Stylised tooth icon -->
+            <path
+              d="M16 5C12.5 5 10 7 10 10C10 12.5 10.5 14 11 16C11.5 18 11 21 11 23C11 25 12.5 27 14 27C15.5 27 16 25 16 23C16 25 16.5 27 18 27C19.5 27 21 25 21 23C21 21 20.5 18 21 16C21.5 14 22 12.5 22 10C22 7 19.5 5 16 5Z"
+              fill="none" stroke="#2D8FD6" stroke-width="1.5" stroke-linejoin="round" />
+            <circle cx="13.5" cy="10" r="1" fill="#2D8FD6" opacity="0.6" />
+            <circle cx="18.5" cy="10" r="1" fill="#2D8FD6" opacity="0.6" />
+          </svg>
+          <span class="logo__wordmark">Dentify</span>
+        </a>
+      </header>
+
+      <!-- Form body (centred vertically) -->
+      <div class="login-page__form-body">
+        <!-- Form heading block -->
+        <div class="login-form__header">
+          <p class="login-form__greeting">Acceso institucional</p>
+          <h1 class="login-form__title">Bienvenido.</h1>
+        </div>
+
+        <!-- Login form -->
+        <form class="login-form" id="login-form" method="POST" action="#" novalidate
+          aria-label="Credenciales de acceso">
+          <fieldset class="login-form__fields" aria-label="Credenciales">
+            <legend class="visually-hidden">Ingresá tus credenciales</legend>
+
+            <!-- Email field -->
+            <div class="field">
+              <label class="field__label" for="email">Correo electrónico</label>
+              <div class="field__input-wrapper">
+                <input class="field__input" type="email" id="email" name="email" autocomplete="username"
+                  placeholder="dr.nombre@clinica.com" aria-required="true" aria-describedby="email-error"
+                  spellcheck="false" inputmode="email" />
+              </div>
+              <p class="field__error" id="email-error" aria-live="polite" role="alert"></p>
+            </div>
+
+            <!-- Password field -->
+            <div class="field">
+              <label class="field__label" for="password">Contraseña</label>
+              <div class="field__input-wrapper">
+                <input class="field__input field__input--password" type="password" id="password" name="password"
+                  autocomplete="current-password" placeholder="••••••••••••" aria-required="true"
+                  aria-describedby="password-error" />
+                <button type="button" class="field__toggle-btn" id="toggle-password" aria-label="Mostrar contraseña"
+                  aria-controls="password" aria-pressed="false">
+                  <!-- Eye icon (show) -->
+                  <svg id="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <!-- Eye-off icon (hide) — hidden by default -->
+                  <svg id="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" hidden>
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                </button>
+              </div>
+              <p class="field__error" id="password-error" aria-live="polite" role="alert"></p>
+            </div>
+          </fieldset>
+
+          <!-- Olvidaste credenciales -->
+          <div class="login-form__actions">
+            <a href="/recuperar" class="link--subtle">
+              ¿Olvidaste tus credenciales de acceso?
+            </a>
+          </div>
+
+          <!-- Submit CTA -->
+          <button type="submit" class="btn-cta" id="submit-btn" aria-label="Ingresar al sistema — acceso institucional">
+            <span class="btn-cta__text">Ingresar al Sistema</span>
+            <span class="btn-cta__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </span>
+          </button>
+        </form>
+      </div>
+      <!-- /.login-page__form-body -->
+
+      <!-- Form footer -->
+      <footer class="form-footer login-page__form-footer">
+        <small class="form-footer__copy">
+          &copy; 2026 Dentify. Todos los derechos reservados.
+        </small>
+        <a href="/privacidad" class="form-footer__link">Política de privacidad</a>
+      </footer>
+    </section>
+    <!-- /.login-page__form-col -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         RIGHT COLUMN — Brand panel
+    ═══════════════════════════════════════════════════════════════════ -->
+    <aside class="login-page__brand-col" aria-label="Declaración de marca Dentify">
+      <article class="brand-panel">
+        <!-- Top content: hero headline -->
+        <div class="brand-panel__top">
+          <span class="brand-panel__label">Plataforma de Inteligencia Clínica</span>
+          <h2 class="brand-panel__headline">
+            La clínica<br />
+            bajo<br />
+            <em>control.</em>
+          </h2>
+          <p class="brand-panel__subline">
+            <span style="white-space: nowrap;">Cada historia clínica. Cada decisión de atención.</span><br />
+            En un solo lugar.
+          </p>
+        </div>
+
+        <!-- Middle: animated line separator -->
+        <div class="brand-panel__line-container" aria-hidden="true">
+          <svg class="brand-panel__line-svg" id="accent-line" viewBox="0 0 400 1" preserveAspectRatio="none"
+          aria-hidden="true" focusable="false">
+          <path
+          class="brand-panel__line-path"
+          id="accent-line-path"
+          d="M0,20 L120,20 L140,20 L155,4 L170,36 L185,4 L200,20 L215,20 L400,20"
+          />
+          </svg>
+        </div>
+
+        <!-- Bottom: trust signals -->
+        <div class="brand-panel__bottom">
+          <ul class="brand-panel__stats" aria-label="Platform metrics">
+            <li class="stat stat--primary">
+              <span class="stat__number">-47%</span>
+              <span class="stat__label">Reducción de inasistencias</span>
+            </li>
+            <li class="stat">
+              <span class="stat__number">8h</span>
+              <span class="stat__label">Recuperadas por semana</span>
+            </li>
+            <li class="stat">
+              <span class="stat__number">38</span>
+              <span class="stat__label">Clínicas en operación</span>
+            </li>
+          </ul>
+
+          <div class="brand-panel__badge" role="status" aria-label="Cumple con normativas HIPAA e ISO 27001">
+            <svg class="brand-panel__badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+            <span class="brand-panel__badge-text">Normativa HIPAA &middot; ISO 27001</span>
+          </div>
+        </div>
+      </article>
+    </aside>
+    <!-- /.login-page__brand-col -->
+  </main>
+
+  <script src="js/pages/login.js"></script>
+</body>
+
+</html>
