@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 
-
 // ════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — única fuente de verdad de colores y tipografía
 // ════════════════════════════════════════════════════════════════
