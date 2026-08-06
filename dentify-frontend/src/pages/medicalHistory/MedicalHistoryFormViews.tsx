@@ -1,11 +1,19 @@
 // ════════════════════════════════════════════════════════════════════════════
 // MedicalHistoryFormViews.tsx — "Historia Clínica General" — Dentify
 //
-// Contiene, en un único archivo (pedido explícito del Requirements.md §Anexo):
-//   1) MedicalHistoryCreateView   — formulario de creación (§4 del doc)
-//   2) MedicalHistoryDetailView   — vista de detalle post-guardado (§4.11)
-//   3) Componentes auxiliares: Odontograma, modal "Cargar prestación",
-//      modal "Cargar archivo", listado de "Registros".
+// Fusión de:
+//   - La lógica real (hooks, apiClient, validaciones, manejo de errores) del
+//     archivo vigente en el proyecto.
+//   - Los componentes visuales del diseño de Figma (ToothSVG interactivo,
+//     modales, RegistrosList con badges de cara), que reemplazan por completo
+//     a los viejos ToothIcon / listados planos.
+//
+// Contiene, en un único archivo:
+//   1) MedicalHistoryCreateView   — formulario de creación
+//   2) MedicalHistoryDetailView   — vista de detalle post-guardado
+//   3) Componentes auxiliares: ToothSVG (odontograma), modal "Cargar
+//      prestación", modal "Cargar archivo", listado de "Registros",
+//      leyenda de caras.
 //
 // Decisiones tomadas explícitamente por la persona en Requirements.md §8,
 // implementadas tal cual (no son inferencias propias):
@@ -32,6 +40,19 @@
 //   #18 "Cancelar" descarta los datos y redirige al listado de historiales
 //       de ese paciente.
 //
+// Ajustes visuales/UX pedidos sobre la versión ya fusionada con el diseño de
+// Figma:
+//   D1  RegistrosList: se agrega la fecha al extremo izquierdo de cada fila
+//       (antes del número de pieza), conservando el resto igual.
+//   D2  Al tocar una cara específica del diente en el odontograma, el modal
+//       "Cargar prestación" arranca con esa cara ya seleccionada en el campo
+//       "Cara" (antes siempre arrancaba en "Todo el diente" sin importar
+//       dónde se tocara).
+//   D3  La leyenda de colores por cara (Vestibular/Palatino/.../Todo el
+//       diente) se muestra UNA sola vez por formulario, sin importar si el
+//       odontograma es Adulto, Infantil o Mixto (antes se duplicaba: una vez
+//       por cada grilla renderizada).
+//
 // Lo explícitamente fuera de alcance (documento §1.3 / §8) NO se implementa:
 //   - "Crear nuevo" diagnóstico personalizado (endpoint no-mvp).
 //   - Edición de una MedicalHistory ya persistida (lápiz del detalle).
@@ -48,7 +69,7 @@ import React, {
 import apiClient from "../../api/apiClient";
 
 // ════════════════════════════════════════════════════════════════
-// DESIGN TOKENS — idénticos a HistorialClinicoView.tsx / PatientViews.tsx
+// DESIGN TOKENS
 // ════════════════════════════════════════════════════════════════
 const C = {
   navy: "#0F2244",
@@ -155,10 +176,10 @@ interface ToothRecordResponse {
   id: number;
   pieceNumber: number;
   recordType: string;
-  face: string;
+  toothFace: string;
   observations: string | null;
   createdAt: string;
-  diagnosisType: DiagnosisTypeCatalogResponse | null;
+  diagnosis: DiagnosisTypeCatalogResponse | null;
 }
 
 interface PatientAllergyDetailResponse {
@@ -169,20 +190,44 @@ interface PatientAllergyDetailResponse {
   isAllergyActive: boolean;
 }
 
+interface SimpleUserProfileResponse {
+  id: number;
+  name: string;
+  lastName: string;
+}
+
 interface ComplementaryExamResponse {
   id: number;
-  fileUrl: string;
+  object_key: string;
   filename: string;
   fileType: string;
   uploadDate: string;
-  uploadBy: { id: number; name: string; lastName: string } | null;
+  uploadBy: SimpleUserProfileResponse | null;
 }
 
-interface SimplePersonRef {
+interface PatientDetailResponse {
   id: number;
-  fullName?: string;
-  name?: string;
-  surname?: string;
+  name: string;
+  surname: string;
+  dni: string;
+  dateOfBirth: string;
+  phone: string | null;
+  email: string;
+  coverageType: string | null;
+  insurance: string | null;
+}
+
+interface DentistDetailResponse {
+  id: number;
+  name: string;
+  surname: string;
+  professionalLicense: string;
+}
+
+interface MedicalHistoryEditedByResponse {
+  id: number;
+  name: string;
+  lastName: string;
 }
 
 export interface MedicalHistoryDetailResponse {
@@ -193,61 +238,45 @@ export interface MedicalHistoryDetailResponse {
   observations: string | null;
   hasAllergies: boolean;
   dailyMedication: string | null;
-  allergies: PatientAllergyDetailResponse[];
+
+  patient: PatientDetailResponse;
+  dentist: DentistDetailResponse;
+  editedBy: MedicalHistoryEditedByResponse | null;
+
   toothRecords: ToothRecordResponse[];
-  exams: ComplementaryExamResponse[];
-  dentist: SimplePersonRef;
-  editedBy: SimplePersonRef | null;
-  createdAt: string;
-  updatedAt: string;
+  allergies: PatientAllergyDetailResponse[];
+  complementaryExams: ComplementaryExamResponse[];
 }
 
 // ════════════════════════════════════════════════════════════════
-// GLYPHS — mapeo símbolo → glifo, tomado literalmente del Javadoc de
-// DiagnosisSymbol (fuente de verdad de código real, no inferido) y
-// confirmado visualmente en Imagen 2 ("REFERENCIAS ODONTOGRAMA").
+// GLYPHS & FACE COLORS
 // ════════════════════════════════════════════════════════════════
 const SYMBOL_GLYPHS: Record<DiagnosisSymbol, string> = {
-  ROOT_CANAL_TREATMENT: "TC",
-  INCURABLE_TOOTH_DECAY: "■",
-  MISSING_TOOTH: "X",
-  SILICATE_FILLING: "/S",
-  PARADENTOSIS: "Pd",
-  PERNO: "P",
-  BRIDGE: "⊓",
-  ORTHODONTICS: "〰",
-  TREATABLE_DECAY: "●",
-  EXTRACTION: "=",
-  AMALGAM_FILLING: "/A",
-  ACRYLIC_FILLING: "/Ac",
-  CROWN: "○",
-  INLAY_ONLAY: "|",
-  REMOVABLE_PROSTHESIS: "☐",
-  IMPLANT: "IM",
-  CUSTOM: "◆",
+  ROOT_CANAL_TREATMENT: "TC", INCURABLE_TOOTH_DECAY: "■", MISSING_TOOTH: "X",
+  SILICATE_FILLING: "/S", PARADENTOSIS: "Pd", PERNO: "P", BRIDGE: "⊓",
+  ORTHODONTICS: "〰", TREATABLE_DECAY: "●", EXTRACTION: "=",
+  AMALGAM_FILLING: "/A", ACRYLIC_FILLING: "/Ac", CROWN: "○",
+  INLAY_ONLAY: "|", REMOVABLE_PROSTHESIS: "☐", IMPLANT: "IM", CUSTOM: "◆",
 };
 
-const RECORD_TYPE_LABEL: Record<RecordType, string> = {
-  PRE_EXISTING: "Prestación Preexistente",
-  REQUIRED: "Prestación Requerida",
+// Variantes de 1-2 caracteres para las regiones periféricas del odontograma
+// (zonas angostas): usar el glifo completo ahí lo vuelve ilegible.
+const SHORT_GLYPH: Record<DiagnosisSymbol, string> = {
+  ROOT_CANAL_TREATMENT: "T", INCURABLE_TOOTH_DECAY: "■", MISSING_TOOTH: "X",
+  SILICATE_FILLING: "S", PARADENTOSIS: "P", PERNO: "P", BRIDGE: "⊓",
+  ORTHODONTICS: "≈", TREATABLE_DECAY: "●", EXTRACTION: "=",
+  AMALGAM_FILLING: "A", ACRYLIC_FILLING: "Ac", CROWN: "○",
+  INLAY_ONLAY: "|", REMOVABLE_PROSTHESIS: "☐", IMPLANT: "I", CUSTOM: "◆",
 };
 
 const FACE_LABEL: Record<ToothFace, string> = {
-  VESTIBULAR: "Vestibular",
-  PALATAL: "Palatino",
-  DISTAL: "Distal",
-  MESIAL: "Mesial",
-  INCISAL: "Incisal",
-  WHOLE_TOOTH: "Todo el diente",
+  VESTIBULAR: "Vestibular", PALATAL: "Palatino", DISTAL: "Distal",
+  MESIAL: "Mesial", INCISAL: "Incisal", WHOLE_TOOTH: "Todo el diente",
 };
 
 const FACE_COLOR: Record<ToothFace, string> = {
-  VESTIBULAR: "#7DD3FC",
-  PALATAL: "#F9A8D4",
-  DISTAL: "#FCA5A5",
-  MESIAL: "#6EE7B7",
-  INCISAL: "#C4B5FD",
-  WHOLE_TOOTH: "#FDE68A",
+  VESTIBULAR: "#7DD3FC", PALATAL: "#F9A8D4", DISTAL: "#FCA5A5",
+  MESIAL: "#6EE7B7", INCISAL: "#C4B5FD", WHOLE_TOOTH: "#FDE68A",
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -297,20 +326,18 @@ function buildGrids(type: OdontogramType): OdontogramGrid[] {
 
 function validPieceNumbersFor(type: OdontogramType): Set<number> {
   const set = new Set<number>();
-  const grids =
-    type === "ADULT" ? [buildGrids("ADULT")[0]] : type === "PEDIATRIC" ? [buildGrids("PEDIATRIC")[0]] : buildGrids("MIX");
-  grids.forEach((g) => {
-    [...g.topLeft, ...g.topRight, ...g.bottomLeft, ...g.bottomRight].forEach((p) => set.add(p));
-  });
+  buildGrids(type).forEach((g) =>
+    [...g.topLeft, ...g.topRight, ...g.bottomLeft, ...g.bottomRight].forEach((p) => set.add(p))
+  );
   return set;
 }
-
-const formatPiece = (n: number): string => `${Math.floor(n / 10)}.${n % 10}`;
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════════
+const formatPiece = (n: number): string => `${Math.floor(n / 10)}.${n % 10}`;
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
+const genTempId = (): string => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const formatDateDisplay = (iso: string | null | undefined): string => {
   if (!iso) return "—";
@@ -318,32 +345,519 @@ const formatDateDisplay = (iso: string | null | undefined): string => {
   return `${d}/${m}/${y}`;
 };
 
-const genTempId = (): string => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const fullNameOf = (
+  person:
+    | {
+        name?: string;
+        surname?: string;
+        lastName?: string;
+        fullName?: string;
+      }
+    | null
+    | undefined
+): string => {
+  if (!person) return "";
 
-const fullNameOf = (p: SimplePersonRef | null | undefined): string => {
-  if (!p) return "";
-  if (p.fullName) return p.fullName;
-  return [p.name, p.surname].filter(Boolean).join(" ");
+  if (person.fullName) {
+    return person.fullName;
+  }
+
+  const surname = person.surname ?? person.lastName ?? "";
+
+  return [person.name, surname]
+    .filter(Boolean)
+    .join(" ");
 };
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "application/pdf"];
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 // ════════════════════════════════════════════════════════════════
-// MINI-COMPONENTS — inputs reutilizables
+// SVG TOOTH GEOMETRY
+// ════════════════════════════════════════════════════════════════
+// ViewBox 0 0 40 40, center (20,20), outer r=17, inner r=7
+const CX = 20, CY = 20, RO = 17, RI = 7;
+
+function cpt(deg: number, r: number): [number, number] {
+  const rad = (deg * Math.PI) / 180;
+  return [CX + r * Math.cos(rad), CY + r * Math.sin(rad)];
+}
+
+// Puntos de esquina cada 45°: SE=45°, SW=135°, NW=225°, NE=315°
+const iSE = cpt(45, RI), iSW = cpt(135, RI), iNW = cpt(225, RI), iNE = cpt(315, RI);
+const oSE = cpt(45, RO), oSW = cpt(135, RO), oNW = cpt(225, RO), oNE = cpt(315, RO);
+
+function svgArc(r: number, [x, y]: [number, number], sw: 0 | 1) {
+  return `A ${r},${r} 0 0,${sw} ${x.toFixed(2)},${y.toFixed(2)}`;
+}
+function svgM([x, y]: [number, number]) { return `M ${x.toFixed(2)},${y.toFixed(2)}`; }
+function svgL([x, y]: [number, number]) { return `L ${x.toFixed(2)},${y.toFixed(2)}`; }
+
+// Sectores tipo dona: arco interior CW (sweep=1) → línea al exterior → arco
+// exterior CCW (sweep=0)
+const SECTOR: Record<"top" | "right" | "bottom" | "left", string> = {
+  top:    [svgM(iNW), svgArc(RI, iNE, 1), svgL(oNE), svgArc(RO, oNW, 0), "Z"].join(" "),
+  right:  [svgM(iNE), svgArc(RI, iSE, 1), svgL(oSE), svgArc(RO, oNE, 0), "Z"].join(" "),
+  bottom: [svgM(iSE), svgArc(RI, iSW, 1), svgL(oSW), svgArc(RO, oSE, 0), "Z"].join(" "),
+  left:   [svgM(iSW), svgArc(RI, iNW, 1), svgL(oNW), svgArc(RO, oSW, 0), "Z"].join(" "),
+};
+
+const MID = (RI + RO) / 2; // = 12 — punto medio del anillo, para centrar glifos
+
+const REGION_CENTER: Record<"top" | "right" | "bottom" | "left" | "center", [number, number]> = {
+  top: [CX, CY - MID], right: [CX + MID, CY],
+  bottom: [CX, CY + MID], left: [CX - MID, CY], center: [CX, CY],
+};
+
+// ════════════════════════════════════════════════════════════════
+// FACE ↔ POSICIÓN VISUAL
+// ════════════════════════════════════════════════════════════════
+type VP = "top" | "right" | "bottom" | "left" | "center";
+
+function faceToVP(face: ToothFace, quad: number): VP {
+  const isUpper = [1, 2, 5, 6].includes(quad);
+  const mesialRight = [1, 4, 5, 8].includes(quad);
+  switch (face) {
+    case "VESTIBULAR": return isUpper ? "top" : "bottom";
+    case "PALATAL":    return isUpper ? "bottom" : "top";
+    case "MESIAL":     return mesialRight ? "right" : "left";
+    case "DISTAL":     return mesialRight ? "left" : "right";
+    default:           return "center";
+  }
+}
+
+function vpToFace(pos: VP, quad: number): ToothFace {
+  const isUpper = [1, 2, 5, 6].includes(quad);
+  const mesialRight = [1, 4, 5, 8].includes(quad);
+  switch (pos) {
+    case "top":    return isUpper ? "VESTIBULAR" : "PALATAL";
+    case "bottom": return isUpper ? "PALATAL" : "VESTIBULAR";
+    case "left":   return mesialRight ? "DISTAL" : "MESIAL";
+    case "right":  return mesialRight ? "MESIAL" : "DISTAL";
+    default:       return "INCISAL";
+  }
+}
+
+const OUTER_PETALS = ["top", "right", "bottom", "left"] as const;
+
+// ════════════════════════════════════════════════════════════════
+// TOOTH SVG — 5 regiones, hover por cara, click POR REGIÓN
+// ════════════════════════════════════════════════════════════════
+function ToothSVG({
+  piece, records, onClick, isReadOnly,
+}: {
+  piece: number;
+  records: LocalToothRecordItem[];
+  /**
+   * Se invoca con la cara (ToothFace) exacta de la región tocada — ya no
+   * simplemente "se tocó el diente" — para poder precargar esa cara en el
+   * modal "Cargar prestación" (antes el mini formulario siempre arrancaba en
+   * "Todo el diente" sin importar dónde se hacía click).
+   */
+  onClick?: (face: ToothFace) => void;
+  isReadOnly?: boolean;
+}) {
+  const [hovVP, setHovVP] = useState<VP | null>(null);
+  const quad = Math.floor(piece / 10);
+  const pid = `t${piece}`;
+
+  const wholeRec = records.find(r => r.face === "WHOLE_TOOTH");
+
+  // Agrupa los registros parciales (no WHOLE_TOOTH) por posición visual
+  const byVP = useMemo(() => {
+    const m = new Map<VP, LocalToothRecordItem[]>();
+    for (const r of records) {
+      if (r.face === "WHOLE_TOOTH") continue;
+      const vp = faceToVP(r.face, quad);
+      if (!m.has(vp)) m.set(vp, []);
+      m.get(vp)!.push(r);
+    }
+    return m;
+  }, [records, quad]);
+
+  const primaryRec = wholeRec ?? records[0];
+  const borderColor = primaryRec
+    ? (primaryRec.recordType === "PRE_EXISTING" ? C.preExisting : C.required)
+    : C.border;
+  const borderW = records.length > 0 ? 1.8 : 1.5;
+  const sepOp = wholeRec ? 0.2 : 1;
+
+  const handleRegionClick = (vp: VP) => {
+    if (isReadOnly || !onClick) return;
+    onClick(vpToFace(vp, quad));
+  };
+
+  function renderGlyph(recs: LocalToothRecordItem[], vp: VP) {
+    const r = recs[0];
+    if (!r) return null;
+    const [cx, cy] = REGION_CENTER[vp];
+    const color = r.recordType === "PRE_EXISTING" ? C.preExisting : C.required;
+    const isCenter = vp === "center";
+    const glyphStr = isCenter ? SYMBOL_GLYPHS[r.diagnosisSymbol] : SHORT_GLYPH[r.diagnosisSymbol];
+    const fs = isCenter ? 6.5 : 5.2;
+    return (
+      <g key={vp} clipPath={`url(#${pid}-${vp})`} style={{ pointerEvents: "none" }}>
+        <text
+          x={cx} y={cy}
+          textAnchor="middle" dominantBaseline="central"
+          fontSize={fs} fontWeight="800"
+          fontFamily="'Courier New', monospace"
+          fill={color} style={{ userSelect: "none" }}
+        >
+          {glyphStr}
+        </text>
+        {recs.length > 1 && (
+          <circle cx={cx + (isCenter ? 4.5 : 3.5)} cy={cy - 2.5} r={1.3} fill={color} />
+        )}
+      </g>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+        cursor: isReadOnly ? "default" : "pointer",
+      }}
+      title={formatPiece(piece)}
+    >
+      <svg width={36} height={36} viewBox="0 0 40 40" overflow="visible">
+        <defs>
+          {OUTER_PETALS.map(vp => (
+            <clipPath key={vp} id={`${pid}-${vp}`}>
+              <path d={SECTOR[vp]} />
+            </clipPath>
+          ))}
+          <clipPath id={`${pid}-center`}>
+            <circle cx={CX} cy={CY} r={RI} />
+          </clipPath>
+          <clipPath id={`${pid}-whole`}>
+            <circle cx={CX} cy={CY} r={RO} />
+          </clipPath>
+        </defs>
+
+        {/* Base blanca */}
+        <circle cx={CX} cy={CY} r={RO} fill="white" />
+
+        {/* Tinte de fondo si hay registro WHOLE_TOOTH */}
+        {wholeRec && (
+          <circle cx={CX} cy={CY} r={RO}
+            fill={FACE_COLOR.WHOLE_TOOTH} fillOpacity={0.18} />
+        )}
+
+        {/* Regiones periféricas: hover + tinte de diagnóstico + click por cara */}
+        {OUTER_PETALS.map(vp => {
+          const recs = byVP.get(vp) ?? [];
+          const isHov = hovVP === vp && !isReadOnly;
+          const face = vpToFace(vp, quad);
+          const diagFill = recs.length > 0
+            ? (recs[0].recordType === "PRE_EXISTING" ? "#FEE2E2" : "#DBEAFE")
+            : null;
+          return (
+            <path key={vp} d={SECTOR[vp]}
+              fill={isHov ? FACE_COLOR[face] : diagFill ?? "rgba(0,0,0,0)"}
+              fillOpacity={isHov ? 0.38 : diagFill ? 0.5 : 1}
+              pointerEvents={isReadOnly ? "none" : "all"}
+              style={{ cursor: isReadOnly ? "default" : "pointer" }}
+              onMouseEnter={() => !isReadOnly && setHovVP(vp)}
+              onMouseLeave={() => setHovVP(null)}
+              onClick={() => handleRegionClick(vp)}
+            />
+          );
+        })}
+
+        {/* Líneas separadoras (el círculo interior tapa la parte central) */}
+        {([oSE, oSW, oNW, oNE] as [number, number][]).map((pt, i) => (
+          <line key={i}
+            x1={CX} y1={CY} x2={pt[0].toFixed(2)} y2={pt[1].toFixed(2)}
+            stroke={C.border} strokeWidth={0.75} opacity={sepOp}
+            style={{ pointerEvents: "none" }}
+          />
+        ))}
+
+        {/* Borde exterior */}
+        <circle cx={CX} cy={CY} r={RO}
+          fill="none" stroke={borderColor} strokeWidth={borderW}
+          style={{ pointerEvents: "none" }} />
+
+        {/* Región central (INCISAL) — también con click propio */}
+        {(() => {
+          const recs = byVP.get("center") ?? [];
+          const isHov = hovVP === "center" && !isReadOnly;
+          const diagFill = recs.length > 0
+            ? (recs[0].recordType === "PRE_EXISTING" ? "#FEE2E2" : "#EFF6FF")
+            : "white";
+          const innerStroke = recs.length > 0 && !wholeRec
+            ? (recs[0].recordType === "PRE_EXISTING" ? C.preExisting : C.required)
+            : C.border;
+          return (
+            <circle cx={CX} cy={CY} r={RI}
+              fill={isHov ? FACE_COLOR.INCISAL : diagFill}
+              fillOpacity={isHov ? 0.45 : 1}
+              stroke={innerStroke} strokeWidth={0.85}
+              pointerEvents={isReadOnly ? "none" : "all"}
+              style={{ cursor: isReadOnly ? "default" : "pointer" }}
+              onMouseEnter={() => !isReadOnly && setHovVP("center")}
+              onMouseLeave={() => setHovVP(null)}
+              onClick={() => handleRegionClick("center")}
+            />
+          );
+        })()}
+
+        {/* Glifos de diagnóstico — periféricos */}
+        {OUTER_PETALS.map(vp => renderGlyph(byVP.get(vp) ?? [], vp))}
+
+        {/* Glifo de diagnóstico — centro (INCISAL) */}
+        {renderGlyph(byVP.get("center") ?? [], "center")}
+
+        {/* Glifo WHOLE_TOOTH (recorte de diente completo) */}
+        {wholeRec && (
+          <g clipPath={`url(#${pid}-whole)`} style={{ pointerEvents: "none" }}>
+            <text x={CX} y={CY}
+              textAnchor="middle" dominantBaseline="central"
+              fontSize={8} fontWeight="800"
+              fontFamily="'Courier New', monospace"
+              fill={wholeRec.recordType === "PRE_EXISTING" ? C.preExisting : C.required}
+              style={{ userSelect: "none" }}
+            >
+              {SYMBOL_GLYPHS[wholeRec.diagnosisSymbol]}
+            </text>
+          </g>
+        )}
+      </svg>
+
+      <span style={{ fontFamily: FONT_SANS, fontSize: 9.5, color: C.textMuted, lineHeight: 1 }}>
+        {formatPiece(piece)}
+      </span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ODONTOGRAMA — grilla + leyenda (leyenda extraída, ver FaceLegend)
+// ════════════════════════════════════════════════════════════════
+function OdontogramGridView({
+  grid, itemsByPiece, onPieceClick, isReadOnly,
+}: {
+  grid: OdontogramGrid;
+  itemsByPiece: Map<number, LocalToothRecordItem[]>;
+  onPieceClick: (piece: number, face: ToothFace) => void;
+  isReadOnly?: boolean;
+}) {
+  const renderRow = (left: number[], right: number[]) => (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, flexWrap: "nowrap" }}>
+      {left.map(p => (
+        <ToothSVG key={p} piece={p}
+          records={itemsByPiece.get(p) ?? []}
+          onClick={(face) => onPieceClick(p, face)}
+          isReadOnly={isReadOnly}
+        />
+      ))}
+      <div style={{ width: 1, alignSelf: "stretch", background: C.border, flexShrink: 0, margin: "0 4px" }} />
+      {right.map(p => (
+        <ToothSVG key={p} piece={p}
+          records={itemsByPiece.get(p) ?? []}
+          onClick={(face) => onPieceClick(p, face)}
+          isReadOnly={isReadOnly}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {grid.label && (
+        <div style={{
+          fontFamily: FONT_SANS, fontSize: 10.5, fontWeight: 700,
+          color: C.textMuted, marginBottom: 8, textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}>
+          {grid.label}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {renderRow(grid.topLeft, grid.topRight)}
+        <div style={{ height: 1, background: C.border }} />
+        {renderRow(grid.bottomLeft, grid.bottomRight)}
+      </div>
+      {/* Nota: la leyenda de colores por cara ya NO se renderiza acá adentro.
+          Antes se repetía una vez por cada grilla (Adulto + Infantil en modo
+          Mixto quedaban con dos leyendas idénticas apiladas). Ahora vive una
+          sola vez en <FaceLegend/>, fuera del .map de grillas. */}
+    </div>
+  );
+}
+
+function FaceLegend() {
+  return (
+    <div style={{
+      display: "flex", flexWrap: "wrap", gap: "6px 14px",
+      marginTop: 2, marginBottom: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`,
+    }}>
+      {(Object.entries(FACE_LABEL) as [ToothFace, string][]).map(([face, label]) => (
+        <div key={face} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: 2,
+            background: FACE_COLOR[face], border: `1px solid ${C.border}`,
+            flexShrink: 0,
+          }} />
+          <span style={{ fontFamily: FONT_SANS, fontSize: 10.5, color: C.textSecondary }}>
+            {label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// REGISTROS (formulario de creación) — filas estructuradas con badge de cara
+// y fecha a la izquierda
+// ════════════════════════════════════════════════════════════════
+function RegistrosList({
+  items, onEdit, onDelete,
+}: {
+  items: LocalToothRecordItem[];
+  onEdit: (item: LocalToothRecordItem) => void;
+  onDelete: (tempId: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  // Ajuste pedido: mostrar la fecha al extremo izquierdo de cada fila. Como
+  // estos ítems son locales (todavía no persistidos, no tienen createdAt
+  // propio del backend), se muestra la fecha de hoy — el día en que
+  // efectivamente se está cargando la prestación.
+  const todayLabel = formatDateDisplay(todayISO());
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center",
+          justifyContent: "space-between", padding: "8px 0",
+          background: "transparent", border: "none",
+          borderTop: `1px solid ${C.border}`, cursor: "pointer",
+        }}
+      >
+        <span style={{
+          fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700,
+          color: C.textMuted, letterSpacing: "0.06em",
+        }}>
+          REGISTROS ({items.length})
+        </span>
+        <span style={{ color: C.textMuted, fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && items.length === 0 && (
+        <div style={{
+          padding: "12px 4px", fontFamily: FONT_SANS, fontSize: 12.5,
+          color: C.textMuted, fontStyle: "italic",
+        }}>
+          Sin registros cargados todavía.
+        </div>
+      )}
+
+      {open && items.map(item => (
+        <div key={item.tempId} style={{ borderBottom: `1px solid ${C.border}` }}>
+          {/* Fila principal */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between", padding: "9px 4px",
+            gap: 8,
+          }}>
+            {/* Izquierda: fecha + pieza + badge de cara + nombre de diagnóstico */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+              <span style={{
+                fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600,
+                color: C.textMuted, flexShrink: 0, whiteSpace: "nowrap",
+              }}>
+                {todayLabel}
+              </span>
+              <span style={{ color: C.textMuted, flexShrink: 0, fontSize: 12 }}>·</span>
+              <span style={{
+                fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700,
+                color: C.textPrimary, flexShrink: 0,
+              }}>
+                {item.pieceNumbers.map(formatPiece).join(", ")}
+              </span>
+              <span style={{ color: C.textMuted, flexShrink: 0, fontSize: 12 }}>·</span>
+              {/* Badge de cara */}
+              <span style={{
+                display: "inline-flex", alignItems: "center",
+                padding: "1px 7px", borderRadius: 5,
+                background: FACE_COLOR[item.face] + "55",
+                border: `1px solid ${FACE_COLOR[item.face]}99`,
+                fontFamily: FONT_SANS, fontSize: 11, fontWeight: 600,
+                color: C.textPrimary, flexShrink: 0, whiteSpace: "nowrap",
+              }}>
+                {FACE_LABEL[item.face]}
+              </span>
+              <span style={{
+                fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {item.diagnosisName}
+              </span>
+            </div>
+
+            {/* Derecha: tipo de prestación + acciones */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <span style={{
+                fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700,
+                letterSpacing: "0.04em",
+                color: item.recordType === "PRE_EXISTING" ? C.preExisting : C.required,
+              }}>
+                {item.recordType === "PRE_EXISTING" ? "PREEXISTENTE ●" : "REQUERIDA ●"}
+              </span>
+              <button
+                onClick={() => onEdit(item)}
+                title="Editar"
+                style={{
+                  border: "none", background: "transparent",
+                  cursor: "pointer", color: C.textMuted, fontSize: 14, padding: 2,
+                }}
+              >
+                ✎
+              </button>
+              <button
+                onClick={() => onDelete(item.tempId)}
+                title="Quitar"
+                style={{
+                  border: "none", background: "transparent",
+                  cursor: "pointer", color: C.errorIcon, fontSize: 13, padding: 2,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Observaciones — solo si hay */}
+          {item.observations && (
+            <div style={{
+              padding: "0 4px 8px 4px",
+              fontFamily: FONT_SANS, fontSize: 12, color: C.textSecondary,
+              lineHeight: 1.45,
+            }}>
+              {item.observations}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// PRIMITIVAS DE UI COMPARTIDAS
 // ════════════════════════════════════════════════════════════════
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label
-      style={{
-        display: "block",
-        fontFamily: FONT_SANS,
-        fontSize: 12.5,
-        fontWeight: 600,
-        color: C.textSecondary,
-        marginBottom: 6,
-      }}
-    >
+    <label style={{
+      display: "block", fontFamily: FONT_SANS, fontSize: 12.5,
+      fontWeight: 600, color: C.textSecondary, marginBottom: 6,
+    }}>
       {children}
       {required && <span style={{ color: C.errorIcon }}> *</span>}
     </label>
@@ -351,88 +865,45 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 }
 
 const inputBaseStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  border: `1.5px solid ${C.border}`,
-  borderRadius: 8,
-  fontFamily: FONT_SANS,
-  fontSize: 13,
-  color: C.textPrimary,
-  background: C.cardBg,
-  outline: "none",
-  boxSizing: "border-box",
+  width: "100%", padding: "9px 12px",
+  border: `1.5px solid ${C.border}`, borderRadius: 8,
+  fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary,
+  background: C.cardBg, outline: "none", boxSizing: "border-box",
 };
 
-function TextArea({
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-  maxLength,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  rows?: number;
-  maxLength?: number;
+function TextArea({ value, onChange, placeholder, rows = 4, maxLength }: {
+  value: string; onChange: (v: string) => void;
+  placeholder?: string; rows?: number; maxLength?: number;
 }) {
   return (
     <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      maxLength={maxLength}
-      style={{ ...inputBaseStyle, resize: "vertical", fontFamily: FONT_SANS }}
+      value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} rows={rows} maxLength={maxLength}
+      style={{ ...inputBaseStyle, resize: "vertical" }}
     />
   );
 }
 
-function PrimaryButton({
-  children,
-  onClick,
-  disabled,
-  variant = "primary",
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: "primary" | "secondary" | "danger";
+function PrimaryButton({ children, onClick, disabled, variant = "primary" }: {
+  children: React.ReactNode; onClick?: () => void;
+  disabled?: boolean; variant?: "primary" | "secondary" | "danger";
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [hov, setHov] = useState(false);
   const bg =
-    variant === "primary"
-      ? disabled
-        ? "#93B4F8"
-        : hovered
-        ? "#1d4ed8"
-        : C.electric
-      : variant === "danger"
-      ? hovered
-        ? "#B91C1C"
-        : C.errorIcon
-      : hovered
-      ? C.activeItemBg
-      : C.cardBg;
-  const color = variant === "secondary" ? C.textSecondary : "#fff";
-  const border = variant === "secondary" ? `1.5px solid ${C.border}` : "none";
+    variant === "primary" ? (disabled ? "#93B4F8" : hov ? "#1d4ed8" : C.electric) :
+    variant === "danger"  ? (hov ? "#B91C1C" : C.errorIcon) :
+    (hov ? C.activeItemBg : C.cardBg);
+  const clr = variant === "secondary" ? C.textSecondary : "#fff";
+  const bdr = variant === "secondary" ? `1.5px solid ${C.border}` : "none";
   return (
     <button
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onClick={onClick} disabled={disabled}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
-        padding: "9px 20px",
-        borderRadius: 7,
-        border,
-        background: bg,
-        color,
-        fontFamily: FONT_SANS,
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background 0.15s",
+        padding: "9px 20px", borderRadius: 7, border: bdr,
+        background: bg, color: clr, fontFamily: FONT_SANS,
+        fontSize: 13, fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer", transition: "background 0.15s",
       }}
     >
       {children}
@@ -441,76 +912,53 @@ function PrimaryButton({
 }
 
 // ════════════════════════════════════════════════════════════════
-// MODAL — Referencias Odontograma (Imagen 2) — solo lectura
+// MODAL — Referencias Odontograma — solo lectura
 // ════════════════════════════════════════════════════════════════
 const REFERENCE_ROWS: Array<{ glyph: string; label: string }> = [
-  { glyph: "TC", label: "Tratamiento de Conducto" },
-  { glyph: "●", label: "Caries Curable" },
-  { glyph: "■", label: "Caries Incurable" },
-  { glyph: "=", label: "Extracción" },
-  { glyph: "X", label: "Diente Ausente" },
-  { glyph: "/A", label: "Obturación Amalgama" },
-  { glyph: "/S", label: "Obturación Silicato" },
+  { glyph: "TC",  label: "Tratamiento de Conducto" },
+  { glyph: "●",   label: "Caries Curable" },
+  { glyph: "■",   label: "Caries Incurable" },
+  { glyph: "=",   label: "Extracción" },
+  { glyph: "X",   label: "Diente Ausente" },
+  { glyph: "/A",  label: "Obturación Amalgama" },
+  { glyph: "/S",  label: "Obturación Silicato" },
   { glyph: "/Ac", label: "Obturación Acrílico/Composite" },
-  { glyph: "Pd", label: "Paradentosis" },
-  { glyph: "○", label: "Corona" },
-  { glyph: "P", label: "Pivot" },
-  { glyph: "|", label: "Incrustación" },
-  { glyph: "⊓", label: "Puente" },
-  { glyph: "☐", label: "Prot. Removible" },
-  { glyph: "〰", label: "Ortodoncia" },
-  { glyph: "IM", label: "Implante" },
+  { glyph: "Pd",  label: "Paradentosis" },
+  { glyph: "○",   label: "Corona" },
+  { glyph: "P",   label: "Pivot" },
+  { glyph: "|",   label: "Incrustación" },
+  { glyph: "⊓",   label: "Puente" },
+  { glyph: "☐",   label: "Prot. Removible" },
+  { glyph: "〰",   label: "Ortodoncia" },
+  { glyph: "IM",  label: "Implante" },
 ];
 
-function ModalShell({
-  title,
-  onClose,
-  children,
-  width = 520,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  width?: number;
+function ModalShell({ title, onClose, children, width = 520 }: {
+  title: string; onClose: () => void; children: React.ReactNode; width?: number;
 }) {
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15,34,68,0.35)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
+        position: "fixed", inset: 0, background: "rgba(15,34,68,0.35)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
       }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        style={{
-          width,
-          maxWidth: "92vw",
-          maxHeight: "88vh",
-          overflowY: "auto",
-          background: C.cardBg,
-          borderRadius: 12,
-          boxShadow: "0 12px 48px rgba(15,34,68,0.25)",
-          padding: 24,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+      <div style={{
+        width, maxWidth: "92vw", maxHeight: "88vh", overflowY: "auto",
+        background: C.cardBg, borderRadius: 12,
+        boxShadow: "0 12px 48px rgba(15,34,68,0.25)", padding: 24,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18,
+        }}>
           <h3 style={{ fontFamily: FONT_SANS, fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0 }}>
             {title}
           </h3>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            style={{ border: "none", background: "transparent", cursor: "pointer", color: C.textMuted, fontSize: 18 }}
-          >
-            ✕
-          </button>
+          <button onClick={onClose} aria-label="Cerrar" style={{
+            border: "none", background: "transparent", cursor: "pointer",
+            color: C.textMuted, fontSize: 18,
+          }}>✕</button>
         </div>
         {children}
       </div>
@@ -522,24 +970,29 @@ function ReferenciasModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalShell title="Referencias Odontograma" onClose={onClose} width={560}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px" }}>
-        {REFERENCE_ROWS.map((r) => (
+        {REFERENCE_ROWS.map(r => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 26, fontFamily: FONT_SANS, fontWeight: 700, fontSize: 13, color: C.textPrimary }}>
-              {r.glyph}
-            </span>
+            <span style={{
+              width: 28, fontFamily: "'Courier New', monospace",
+              fontWeight: 700, fontSize: 13, color: C.textPrimary,
+            }}>{r.glyph}</span>
             <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textSecondary }}>{r.label}</span>
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 18, marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: C.preExisting, display: "inline-block" }} />
-          <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textSecondary }}>Prestación Preexistente</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 9, height: 9, borderRadius: "50%", background: C.required, display: "inline-block" }} />
-          <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textSecondary }}>Prestación Requerida</span>
-        </div>
+      <div style={{
+        display: "flex", gap: 18, marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}`,
+      }}>
+        {([["PRE_EXISTING", "Prestación Preexistente"], ["REQUIRED", "Prestación Requerida"]] as const).map(([t, label]) => (
+          <div key={t} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              width: 9, height: 9, borderRadius: "50%",
+              background: t === "PRE_EXISTING" ? C.preExisting : C.required,
+              display: "inline-block",
+            }} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textSecondary }}>{label}</span>
+          </div>
+        ))}
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
         <PrimaryButton onClick={onClose}>ENTENDIDO</PrimaryButton>
@@ -549,107 +1002,22 @@ function ReferenciasModal({ onClose }: { onClose: () => void }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ODONTOGRAMA INTERACTIVO
-// ════════════════════════════════════════════════════════════════
-function ToothIcon({
-  piece,
-  record,
-  onClick,
-}: {
-  piece: number;
-  record: LocalToothRecordItem | undefined;
-  onClick: () => void;
-}) {
-  const color = record ? (record.recordType === "PRE_EXISTING" ? C.preExisting : C.required) : C.textMuted;
-  const glyph = record ? SYMBOL_GLYPHS[record.diagnosisSymbol] : "";
-  return (
-    <button
-      onClick={onClick}
-      title={record ? `${formatPiece(piece)} · ${record.diagnosisName}` : formatPiece(piece)}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 2,
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        padding: 2,
-      }}
-    >
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: "50%",
-          border: `2px solid ${color}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: FONT_SANS,
-          fontSize: 12,
-          fontWeight: 700,
-          color,
-        }}
-      >
-        {glyph}
-      </div>
-      <span style={{ fontFamily: FONT_SANS, fontSize: 10.5, color: C.textMuted }}>{formatPiece(piece)}</span>
-    </button>
-  );
-}
-
-function OdontogramGridView({
-  grid,
-  itemsByPiece,
-  onPieceClick,
-}: {
-  grid: OdontogramGrid;
-  itemsByPiece: Map<number, LocalToothRecordItem>;
-  onPieceClick: (piece: number) => void;
-}) {
-  const renderRow = (left: number[], right: number[]) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      {left.map((p) => (
-        <ToothIcon key={p} piece={p} record={itemsByPiece.get(p)} onClick={() => onPieceClick(p)} />
-      ))}
-      <div style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 6px" }} />
-      {right.map((p) => (
-        <ToothIcon key={p} piece={p} record={itemsByPiece.get(p)} onClick={() => onPieceClick(p)} />
-      ))}
-    </div>
-  );
-
-  return (
-    <div style={{ marginBottom: 14 }}>
-      {grid.label && (
-        <div style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 6, textTransform: "uppercase" }}>
-          {grid.label}
-        </div>
-      )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {renderRow(grid.topLeft, grid.topRight)}
-        <div style={{ height: 1, background: C.border }} />
-        {renderRow(grid.bottomLeft, grid.bottomRight)}
-      </div>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-// MODAL — Cargar prestación (§4.3)
+// MODAL — Cargar prestación
 // ════════════════════════════════════════════════════════════════
 function CargarPrestacionModal({
-  odontogramType,
-  initialPieceNumbers,
-  editingItem,
-  diagnosisCatalog,
-  onClose,
-  onSave,
+  odontogramType, initialPieceNumbers, editingItem, initialFace, diagnosisCatalog, onClose, onSave,
 }: {
   odontogramType: OdontogramType;
   initialPieceNumbers: number[];
   editingItem?: LocalToothRecordItem;
+  /**
+   * Cara pre-seleccionada al abrir un registro NUEVO (ajuste pedido): si el
+   * usuario tocó una región específica del diente, el mini formulario debe
+   * arrancar en esa cara en vez de siempre en "Todo el diente". Si se está
+   * editando un registro existente, `editingItem.face` tiene prioridad sobre
+   * este valor.
+   */
+  initialFace?: ToothFace;
   diagnosisCatalog: DiagnosisTypeCatalogResponse[];
   onClose: () => void;
   onSave: (item: LocalToothRecordItem) => void;
@@ -657,7 +1025,7 @@ function CargarPrestacionModal({
   const [recordType, setRecordType] = useState<RecordType>(editingItem?.recordType ?? "PRE_EXISTING");
   const [pieceNumbers, setPieceNumbers] = useState<number[]>(editingItem?.pieceNumbers ?? initialPieceNumbers);
   const [pieceInput, setPieceInput] = useState("");
-  const [face, setFace] = useState<ToothFace>(editingItem?.face ?? "WHOLE_TOOTH");
+  const [face, setFace] = useState<ToothFace>(editingItem?.face ?? initialFace ?? "WHOLE_TOOTH");
   const [diagnosisId, setDiagnosisId] = useState<number | null>(editingItem?.diagnosisId ?? null);
   const [diagnosisQuery, setDiagnosisQuery] = useState(editingItem?.diagnosisName ?? "");
   const [showDiagnosisList, setShowDiagnosisList] = useState(false);
@@ -669,7 +1037,7 @@ function CargarPrestacionModal({
   const filteredDiagnoses = useMemo(() => {
     const q = diagnosisQuery.trim().toLowerCase();
     if (!q) return diagnosisCatalog;
-    return diagnosisCatalog.filter((d) => d.name.toLowerCase().includes(q));
+    return diagnosisCatalog.filter(d => d.name.toLowerCase().includes(q));
   }, [diagnosisCatalog, diagnosisQuery]);
 
   const addPiece = () => {
@@ -679,35 +1047,22 @@ function CargarPrestacionModal({
       setFormError(`La pieza ${pieceInput} no es válida para el tipo de odontograma seleccionado.`);
       return;
     }
-    if (!pieceNumbers.includes(n)) setPieceNumbers((prev) => [...prev, n]);
+    if (!pieceNumbers.includes(n)) setPieceNumbers(prev => [...prev, n]);
     setPieceInput("");
     setFormError(null);
   };
 
-  const removePiece = (n: number) => setPieceNumbers((prev) => prev.filter((p) => p !== n));
+  const removePiece = (n: number) => setPieceNumbers(prev => prev.filter(p => p !== n));
 
   const handleSave = () => {
-    if (pieceNumbers.length === 0) {
-      setFormError("Seleccioná al menos una pieza.");
-      return;
-    }
-    if (diagnosisId == null) {
-      setFormError("Seleccioná un diagnóstico.");
-      return;
-    }
-    const diagnosis = diagnosisCatalog.find((d) => d.id === diagnosisId);
-    if (!diagnosis) {
-      setFormError("El diagnóstico seleccionado ya no está disponible.");
-      return;
-    }
+    if (pieceNumbers.length === 0) { setFormError("Seleccioná al menos una pieza."); return; }
+    if (diagnosisId == null) { setFormError("Seleccioná un diagnóstico."); return; }
+    const diagnosis = diagnosisCatalog.find(d => d.id === diagnosisId);
+    if (!diagnosis) { setFormError("El diagnóstico seleccionado ya no está disponible."); return; }
     onSave({
       tempId: editingItem?.tempId ?? genTempId(),
-      pieceNumbers,
-      recordType,
-      face,
-      diagnosisId,
-      diagnosisName: diagnosis.name,
-      diagnosisSymbol: diagnosis.symbol,
+      pieceNumbers, recordType, face, diagnosisId,
+      diagnosisName: diagnosis.name, diagnosisSymbol: diagnosis.symbol,
       observations: observations.trim() ? observations.trim() : null,
     });
   };
@@ -717,11 +1072,7 @@ function CargarPrestacionModal({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div>
           <FieldLabel>Tipo de prestación</FieldLabel>
-          <select
-            value={recordType}
-            onChange={(e) => setRecordType(e.target.value as RecordType)}
-            style={inputBaseStyle}
-          >
+          <select value={recordType} onChange={e => setRecordType(e.target.value as RecordType)} style={inputBaseStyle}>
             <option value="PRE_EXISTING">🔴 Prestación Preexistente</option>
             <option value="REQUIRED">🔵 Prestación Requerida</option>
           </select>
@@ -732,116 +1083,73 @@ function CargarPrestacionModal({
           <div style={{ display: "flex", gap: 6 }}>
             <input
               value={pieceInput}
-              onChange={(e) => setPieceInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addPiece();
-                }
-              }}
+              onChange={e => setPieceInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addPiece(); } }}
               placeholder="Ej: 1.4"
               style={inputBaseStyle}
             />
-            <PrimaryButton variant="secondary" onClick={addPiece}>
-              +
-            </PrimaryButton>
+            <PrimaryButton variant="secondary" onClick={addPiece}>+</PrimaryButton>
           </div>
         </div>
       </div>
 
       {pieceNumbers.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-          {pieceNumbers.map((p) => (
-            <span
-              key={p}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "3px 8px",
-                borderRadius: 6,
-                background: C.activeItemBg,
-                border: `1px solid ${C.border}`,
-                fontFamily: FONT_SANS,
-                fontSize: 12,
-                color: C.electric,
-                fontWeight: 600,
-              }}
-            >
+          {pieceNumbers.map(p => (
+            <span key={p} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "3px 8px", borderRadius: 6,
+              background: C.activeItemBg, border: `1px solid ${C.border}`,
+              fontFamily: FONT_SANS, fontSize: 12, color: C.electric, fontWeight: 600,
+            }}>
               {formatPiece(p)}
-              <span style={{ cursor: "pointer" }} onClick={() => removePiece(p)}>
-                ✕
-              </span>
+              <span style={{ cursor: "pointer" }} onClick={() => removePiece(p)}>✕</span>
             </span>
           ))}
         </div>
       )}
 
+      {/* Cara */}
       <div style={{ marginTop: 16 }}>
         <FieldLabel>Cara</FieldLabel>
-        {/* Nota: el backend acepta una única cara por CreateToothRecordItem (`face: ToothFace`).
-            Se implementa como single-select para respetar el contrato ya existente
-            (Requirements.md §8 #7 — pregunta abierta no resuelta por la persona;
-            se prioriza el contrato de backend confirmado por código). */}
-        <select value={face} onChange={(e) => setFace(e.target.value as ToothFace)} style={inputBaseStyle}>
-          {(Object.keys(FACE_LABEL) as ToothFace[]).map((f) => (
-            <option key={f} value={f}>
-              {FACE_LABEL[f]}
-            </option>
+        {/* Nota: el backend acepta una única cara por CreateToothRecordItem
+            (`face: ToothFace`), por eso sigue siendo un single-select. */}
+        <select value={face} onChange={e => setFace(e.target.value as ToothFace)} style={inputBaseStyle}>
+          {(Object.keys(FACE_LABEL) as ToothFace[]).map(f => (
+            <option key={f} value={f}>{FACE_LABEL[f]}</option>
           ))}
         </select>
       </div>
 
+      {/* Diagnóstico */}
       <div style={{ marginTop: 16, position: "relative" }}>
         <FieldLabel>Diagnóstico</FieldLabel>
         <input
           value={diagnosisQuery}
-          onChange={(e) => {
-            setDiagnosisQuery(e.target.value);
-            setShowDiagnosisList(true);
-            setDiagnosisId(null);
-          }}
+          onChange={e => { setDiagnosisQuery(e.target.value); setShowDiagnosisList(true); setDiagnosisId(null); }}
           onFocus={() => setShowDiagnosisList(true)}
           placeholder="Buscar diagnóstico..."
           style={inputBaseStyle}
         />
         {showDiagnosisList && (
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              maxHeight: 200,
-              overflowY: "auto",
-              background: C.cardBg,
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              boxShadow: "0 8px 24px rgba(15,34,68,0.12)",
-              marginTop: 4,
-            }}
-          >
-            {filteredDiagnoses.map((d) => (
-              <div
-                key={d.id}
-                onClick={() => {
-                  setDiagnosisId(d.id);
-                  setDiagnosisQuery(d.name);
-                  setShowDiagnosisList(false);
-                }}
+          <div style={{
+            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
+            maxHeight: 200, overflowY: "auto", background: C.cardBg,
+            border: `1px solid ${C.border}`, borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(15,34,68,0.12)", marginTop: 4,
+          }}>
+            {filteredDiagnoses.map(d => (
+              <div key={d.id}
+                onClick={() => { setDiagnosisId(d.id); setDiagnosisQuery(d.name); setShowDiagnosisList(false); }}
                 style={{
-                  padding: "8px 12px",
-                  fontFamily: FONT_SANS,
-                  fontSize: 13,
-                  color: C.textPrimary,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                  padding: "8px 12px", fontFamily: FONT_SANS, fontSize: 13,
+                  color: C.textPrimary, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
                 }}
               >
-                <span style={{ fontWeight: 700, width: 24 }}>{SYMBOL_GLYPHS[d.symbol]}</span>
+                <span style={{ fontWeight: 700, width: 28, fontFamily: "'Courier New', monospace" }}>
+                  {SYMBOL_GLYPHS[d.symbol]}
+                </span>
                 {d.name}
               </div>
             ))}
@@ -850,17 +1158,13 @@ function CargarPrestacionModal({
                 Sin resultados
               </div>
             )}
-            {/* "Crear nuevo" fuera de alcance de esta especificación (endpoint no-mvp) — se
-                muestra deshabilitado para no romper el layout observado en Imagen 7. */}
+            {/* "Crear nuevo" diagnóstico fuera de alcance (endpoint no-mvp) —
+                se muestra deshabilitado para no romper el layout esperado. */}
             <div
               title="Próximamente"
               style={{
-                padding: "8px 12px",
-                borderTop: `1px solid ${C.border}`,
-                fontFamily: FONT_SANS,
-                fontSize: 13,
-                color: C.textMuted,
-                cursor: "not-allowed",
+                padding: "8px 12px", borderTop: `1px solid ${C.border}`,
+                fontFamily: FONT_SANS, fontSize: 13, color: C.textMuted, cursor: "not-allowed",
               }}
             >
               + Crear nuevo
@@ -869,6 +1173,7 @@ function CargarPrestacionModal({
         )}
       </div>
 
+      {/* Observaciones */}
       <div style={{ marginTop: 16 }}>
         <FieldLabel>Observaciones</FieldLabel>
         <TextArea value={observations} onChange={setObservations} placeholder="Observaciones" maxLength={2000} rows={3} />
@@ -879,9 +1184,7 @@ function CargarPrestacionModal({
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-        <PrimaryButton variant="secondary" onClick={onClose}>
-          CANCELAR
-        </PrimaryButton>
+        <PrimaryButton variant="secondary" onClick={onClose}>CANCELAR</PrimaryButton>
         <PrimaryButton onClick={handleSave}>GUARDAR</PrimaryButton>
       </div>
     </ModalShell>
@@ -889,203 +1192,66 @@ function CargarPrestacionModal({
 }
 
 // ════════════════════════════════════════════════════════════════
-// MODAL — Cargar archivo (§4.6 / §8 #9)
+// MODAL — Cargar archivo
 // ════════════════════════════════════════════════════════════════
-function CargarArchivoModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (file: File) => void;
-}) {
+function CargarArchivoModal({ onClose, onSave }: { onClose: () => void; onSave: (file: File) => void }) {
   const [dragOver, setDragOver] = useState(false);
   const [selected, setSelected] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (file: File): string | null => {
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return "Formato no permitido. Solo se aceptan PDF, JPG o PNG.";
-    }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return "El archivo supera el tamaño máximo permitido (15 MB).";
-    }
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) return "Formato no permitido. Solo se aceptan PDF, JPG o PNG.";
+    if (file.size > MAX_FILE_SIZE_BYTES) return "El archivo supera el tamaño máximo permitido (15 MB).";
     return null;
   };
 
   const handleFile = (file: File) => {
     const err = validate(file);
-    if (err) {
-      setError(err);
-      setSelected(null);
-      return;
-    }
-    setError(null);
-    setSelected(file);
+    if (err) { setError(err); setSelected(null); return; }
+    setError(null); setSelected(file);
   };
 
   return (
     <ModalShell title="Cargar archivo" onClose={onClose} width={440}>
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) handleFile(file);
-        }}
+        onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
         style={{
           border: `2px dashed ${dragOver ? C.electric : C.border}`,
-          borderRadius: 10,
-          padding: "36px 20px",
-          textAlign: "center",
+          borderRadius: 10, padding: "36px 20px", textAlign: "center",
           background: dragOver ? C.activeItemBg : C.infoBg,
         }}
       >
-        <div style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.electric, fontWeight: 700, marginBottom: 6 }}>
-          <button
-            onClick={() => inputRef.current?.click()}
-            style={{ border: "none", background: "transparent", color: C.electric, cursor: "pointer", fontWeight: 700, fontFamily: FONT_SANS, fontSize: 13 }}
-          >
-            📄 SELECCIONA ARCHIVO
-          </button>
+        <button onClick={() => inputRef.current?.click()} style={{
+          border: "none", background: "transparent", color: C.electric,
+          cursor: "pointer", fontWeight: 700, fontFamily: FONT_SANS, fontSize: 13,
+        }}>
+          📄 SELECCIONA ARCHIVO
+        </button>
+        <div style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textMuted, marginTop: 4 }}>
+          o arrástralo y soltalo aquí
         </div>
-        <div style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textMuted }}>o arrástralo y soltalo aquí</div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ALLOWED_MIME_TYPES.join(",")}
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
-          }}
-        />
+        <input ref={inputRef} type="file" accept={ALLOWED_MIME_TYPES.join(",")} style={{ display: "none" }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
       </div>
-
       {selected && !error && (
         <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.textSecondary }}>
           Seleccionado: <strong>{selected.name}</strong> ({(selected.size / 1024 / 1024).toFixed(2)} MB)
         </div>
       )}
       {error && <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.errorText }}>{error}</div>}
-
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-        <PrimaryButton variant="secondary" onClick={onClose}>
-          CANCELAR
-        </PrimaryButton>
-        <PrimaryButton
-          disabled={!selected || !!error}
-          onClick={() => {
-            if (selected) onSave(selected);
-          }}
-        >
-          GUARDAR
-        </PrimaryButton>
+        <PrimaryButton variant="secondary" onClick={onClose}>CANCELAR</PrimaryButton>
+        <PrimaryButton disabled={!selected || !!error} onClick={() => { if (selected) onSave(selected); }}>GUARDAR</PrimaryButton>
       </div>
     </ModalShell>
   );
 }
 
 // ════════════════════════════════════════════════════════════════
-// LISTADO — "Registros" dentro del formulario de creación (§4.4)
-// ════════════════════════════════════════════════════════════════
-function RegistrosList({
-  items,
-  onEdit,
-  onDelete,
-}: {
-  items: LocalToothRecordItem[];
-  onEdit: (item: LocalToothRecordItem) => void;
-  onDelete: (tempId: string) => void;
-}) {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          cursor: "pointer",
-          padding: "8px 0",
-          borderTop: `1px solid ${C.border}`,
-        }}
-      >
-        <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em" }}>
-          REGISTROS
-        </span>
-        <span style={{ color: C.textMuted, fontSize: 12 }}>{open ? "▲" : "▼"}</span>
-      </div>
-      {open &&
-        items.map((item) => (
-          <div
-            key={item.tempId}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 4px",
-              borderBottom: `1px solid ${C.border}`,
-            }}
-          >
-            <div>
-              <div style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary }}>
-                {todayISO() === undefined ? "" : formatDateDisplay(todayISO())} |{" "}
-                <strong>{item.pieceNumbers.map(formatPiece).join(", ")}</strong> | {item.diagnosisName}
-              </div>
-              {item.observations && (
-                <div style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-                  {item.observations}
-                </div>
-              )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <span
-                style={{
-                  fontFamily: FONT_SANS,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.04em",
-                  color: item.recordType === "PRE_EXISTING" ? C.preExisting : C.required,
-                }}
-              >
-                {item.recordType === "PRE_EXISTING" ? "PREEXISTENTE ●" : "REQUERIDA ●"}
-              </span>
-              <button
-                onClick={() => onEdit(item)}
-                title="Editar (local)"
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: C.textMuted }}
-              >
-                ✎
-              </button>
-              <button
-                onClick={() => onDelete(item.tempId)}
-                title="Quitar (local)"
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: C.errorIcon }}
-              >
-                🗑
-              </button>
-            </div>
-          </div>
-        ))}
-      {open && items.length === 0 && (
-        <div style={{ padding: "14px 4px", fontFamily: FONT_SANS, fontSize: 12.5, color: C.textMuted, fontStyle: "italic" }}>
-          Sin registros cargados todavía.
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-// HOOKS — catálogos (diagnóstico / alergias)
+// HOOKS — catálogos (diagnóstico / alergias), vía apiClient real
 // ════════════════════════════════════════════════════════════════
 function useCatalog<T>(url: string): { data: T[]; loading: boolean; error: string | null } {
   const [data, setData] = useState<T[]>([]);
@@ -1115,11 +1281,11 @@ function useCatalog<T>(url: string): { data: T[]; loading: boolean; error: strin
 }
 
 // ════════════════════════════════════════════════════════════════
-// MAIN VIEW #1 — MedicalHistoryCreateView (§4 completo)
+// MAIN VIEW #1 — MedicalHistoryCreateView
 // ════════════════════════════════════════════════════════════════
-export interface MedicalHistoryCreateViewProps { 
+export interface MedicalHistoryCreateViewProps {
   userProfile: UserProfileShape | null;
-  roles: string[];       
+  roles: string[];
   patientId: number;
   onCreated: (medicalHistoryId: number, examUploadError?: string | null) => void;
   onCancel: () => void;
@@ -1150,10 +1316,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, onCancel, roles }: MedicalHistoryCreateViewProps) {
-  
+
   const isDentist = roles.includes("ROLE_DENTIST");
 
-  // ── Catálogos ──
+  // ── Catálogos reales ──
   const { data: diagnosisCatalog } = useCatalog<DiagnosisTypeCatalogResponse>("/api/diagnosis-type-catalog");
   const { data: allergyCatalog } = useCatalog<AllergyCatalogOption>("/api/allergies");
 
@@ -1164,7 +1330,7 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
 
   // ── Odontograma / prestaciones ──
   const [toothRecordItems, setToothRecordItems] = useState<LocalToothRecordItem[]>([]);
-  const [modalState, setModalState] = useState<{ pieces: number[]; editing?: LocalToothRecordItem } | null>(null);
+  const [modalState, setModalState] = useState<{ pieces: number[]; editing?: LocalToothRecordItem; initialFace?: ToothFace } | null>(null);
 
   // ── Resto de campos ──
   const [pastMedicalHistory, setPastMedicalHistory] = useState("");
@@ -1182,15 +1348,25 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Cuando cambia el tipo de odontograma, se descartan las piezas que dejaron
-  // de ser válidas (evita quedar con registros locales imposibles de guardar).
+  // de ser válidas.
   useEffect(() => {
     const valid = validPieceNumbersFor(odontogramType);
     setToothRecordItems((prev) => prev.filter((item) => item.pieceNumbers.every((p) => valid.has(p))));
   }, [odontogramType]);
 
+  // Mapa pieza → registros[] (arreglo, no un único registro): una misma
+  // pieza puede tener varios registros simultáneos en caras distintas (ej:
+  // mesial + distal), y ToothSVG ya sabe agrupar y dibujar todos en la
+  // posición que corresponde a cada cara.
   const itemsByPiece = useMemo(() => {
-    const map = new Map<number, LocalToothRecordItem>();
-    toothRecordItems.forEach((item) => item.pieceNumbers.forEach((p) => map.set(p, item)));
+    const map = new Map<number, LocalToothRecordItem[]>();
+    toothRecordItems.forEach((item) => {
+      item.pieceNumbers.forEach((p) => {
+        const arr = map.get(p) ?? [];
+        arr.push(item);
+        map.set(p, arr);
+      });
+    });
     return map;
   }, [toothRecordItems]);
 
@@ -1203,9 +1379,21 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
   }, [allergyCatalog, allergyQuery, selectedAllergies]);
 
   const handlePieceClick = useCallback(
-    (piece: number) => {
-      const existing = itemsByPiece.get(piece);
-      setModalState({ pieces: existing ? existing.pieceNumbers : [piece], editing: existing });
+    (piece: number, clickedFace: ToothFace) => {
+      const existingForPiece = itemsByPiece.get(piece) ?? [];
+      // Ajuste pedido: si ya hay un registro exactamente en la cara tocada,
+      // se edita ese. Si no, pero hay un registro "Todo el diente" sobre la
+      // pieza, se edita ese (cubre toda la pieza igual). Si no hay ninguno,
+      // se abre un registro NUEVO ya pre-cargado con la cara tocada (antes
+      // siempre arrancaba en "Todo el diente" sin importar dónde se clickeaba).
+      const matching =
+        existingForPiece.find((r) => r.face === clickedFace) ??
+        existingForPiece.find((r) => r.face === "WHOLE_TOOTH");
+      setModalState({
+        pieces: matching ? matching.pieceNumbers : [piece],
+        editing: matching,
+        initialFace: matching ? matching.face : clickedFace,
+      });
     },
     [itemsByPiece]
   );
@@ -1243,47 +1431,45 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
     setSaving(true);
 
     const body = {
-      odontogram_type: odontogramType,
-      start_date: startDate,
-      past_medical_history: pastMedicalHistory.trim() || null,
+      odontogramType: odontogramType,
+      startDate: startDate,
+      pastMedicalHistory: pastMedicalHistory.trim() || null,
       observations: observations.trim() || null,
-      has_allergies: !noAllergies,
-      allergy_ids: !noAllergies ? selectedAllergies.map((a) => a.id) : [],
-      daily_medication: dailyMedication.trim() || null,
-      tooth_records: toothRecordItems.map((item) => ({
-        piece_numbers: item.pieceNumbers,
-        record_type: item.recordType,
+      hasAllergies: !noAllergies,
+      allergyIds: !noAllergies ? selectedAllergies.map((a) => a.id) : [],
+      dailyMedication: dailyMedication.trim() || null,
+      toothRecords: toothRecordItems.map((item) => ({
+        pieceNumbers: item.pieceNumbers,
+        recordType: item.recordType,
         face: item.face,
-        diagnosis_id: item.diagnosisId,
+        diagnosisId: item.diagnosisId,
         observations: item.observations,
       })),
     };
 
     try {
       const res = await apiClient.post(`/api/medical-histories?patientId=${patientId}`, body);
-      const medicalHistoryId: number = res.data.id;
+      const idMedicalHistory: number = res.data.idMedicalHistory;
 
       // Exámenes complementarios: llamadas independientes, una por archivo,
-      // solo después de que (1) resolvió con éxito (§1.4 nota de arquitectura).
+      // solo después de que (1) resolvió con éxito.
       let examUploadError: string | null = null;
       for (const pending of pendingFiles) {
         try {
           const formData = new FormData();
           formData.append("file", pending.file);
-          await apiClient.post(`/api/medical-histories/${medicalHistoryId}/exams`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
+          await apiClient.post(`/api/exams/${idMedicalHistory}`, formData);
         } catch (err: any) {
           const msg =
             err?.response?.data?.message ??
             `No se pudo subir el archivo "${pending.file.name}".`;
-          // Se conserva solo el primer error para el cartel de la vista de detalle
-          // (Requirements.md §8 #11: cartel rojo con el motivo exacto).
+          // Se conserva solo el primer error para el cartel de la vista de
+          // detalle (§8 #11: cartel rojo con el motivo exacto).
           examUploadError = examUploadError ?? msg;
         }
       }
 
-      onCreated(medicalHistoryId, examUploadError);
+      onCreated(idMedicalHistory, examUploadError);
     } catch (err: any) {
       const code: BackendErrorCode | undefined = err?.response?.data?.error_code;
       const status = err?.response?.status;
@@ -1362,20 +1548,20 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
               color: C.errorText,
               fontSize: 13,
               marginBottom: 20,
-              maxWidth: 900,
+              maxWidth: 960,
             }}
           >
             {saveError}
           </div>
         )}
 
-        <div style={{ maxWidth: 900, background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
-          {/* ── 2.1 Evolución general ── */}
-          <h4 style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, color: C.textPrimary, marginTop: 0 }}>
+        <div style={{ maxWidth: 960, background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
+          {/* ── Evolución general ── */}
+          <h4 style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, color: C.textPrimary, marginTop: 0, marginBottom: 16 }}>
             Evolución general
           </h4>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
             <div>
               <FieldLabel required>Fecha</FieldLabel>
               <input
@@ -1400,41 +1586,43 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
-            <PrimaryButton
-              onClick={() => setModalState({ pieces: [] })}
-            >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+            <PrimaryButton onClick={() => setModalState({ pieces: [] })}>
               + PRESTACIÓN
             </PrimaryButton>
             <PrimaryButton variant="secondary" onClick={() => setShowReferencias(true)}>
               ⓘ REFERENCIAS
             </PrimaryButton>
-            {/* Nota: el toggle "Tipo de prestación" del header original (Imagen 1) se
-                omite deliberadamente — Requirements.md §8 #2: sin mapeo a ningún
-                endpoint, la persona pidió quitarlo del UI. */}
+            {/* El toggle "Tipo de prestación" del header original no se
+                renderiza — Requirements.md §8 #2: sin mapeo a ningún
+                endpoint, se quitó del UI a pedido explícito. */}
           </div>
 
-          {/* ── 2.2 Odontograma ── */}
-          <div style={{ marginTop: 20 }}>
+          {/* ── Odontograma ── */}
+          <div style={{ overflowX: "auto" }}>
             {grids.map((g) => (
               <OdontogramGridView key={g.key} grid={g} itemsByPiece={itemsByPiece} onPieceClick={handlePieceClick} />
             ))}
+            {/* Leyenda de colores por cara: una sola vez, sin importar si el
+                odontograma es Adulto, Infantil o Mixto (ver nota en
+                OdontogramGridView). */}
+            <FaceLegend />
           </div>
 
-          {/* ── 2.4 Registros ── */}
+          {/* ── Registros ── */}
           <RegistrosList
             items={toothRecordItems}
-            onEdit={(item) => setModalState({ pieces: item.pieceNumbers, editing: item })}
+            onEdit={(item) => setModalState({ pieces: item.pieceNumbers, editing: item, initialFace: item.face })}
             onDelete={handleDeleteToothRecordItem}
           />
 
-          {/* ── 2.3 Antecedentes médicos ── */}
+          {/* ── Antecedentes médicos ── */}
           <div style={{ marginTop: 24 }}>
             <FieldLabel>Antecedentes médicos</FieldLabel>
             <TextArea value={pastMedicalHistory} onChange={setPastMedicalHistory} maxLength={5000} rows={3} />
           </div>
 
-          {/* ── 2.4 Exámenes complementarios ── */}
+          {/* ── Exámenes complementarios ── */}
           <div style={{ marginTop: 20 }}>
             <FieldLabel>Exámenes complementarios</FieldLabel>
             <button
@@ -1482,13 +1670,13 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
             )}
           </div>
 
-          {/* ── 2.5 Observaciones ── */}
+          {/* ── Observaciones ── */}
           <div style={{ marginTop: 20 }}>
             <FieldLabel>Observaciones</FieldLabel>
             <TextArea value={observations} onChange={setObservations} maxLength={2000} rows={3} />
           </div>
 
-          {/* ── 2.6 Alergias ── */}
+          {/* ── Alergias ── */}
           <div style={{ marginTop: 20 }}>
             <FieldLabel>Alergias (Primera consulta)</FieldLabel>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary, cursor: "pointer" }}>
@@ -1498,8 +1686,8 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
                 onChange={(e) => {
                   const checked = e.target.checked;
                   setNoAllergies(checked);
-                  // §8 #15: al marcar "No refiere alergias" el combo desaparece
-                  // directamente; se limpia también la selección visual.
+                  // §8 #15: al marcar "No refiere alergias" el combo
+                  // desaparece directamente; se limpia también la selección.
                   if (checked) setSelectedAllergies([]);
                 }}
               />
@@ -1585,7 +1773,7 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
             )}
           </div>
 
-          {/* ── 2.7 Medicación diaria ── */}
+          {/* ── Medicación diaria ── */}
           <div style={{ marginTop: 20 }}>
             <FieldLabel>Medicación diaria</FieldLabel>
             <TextArea value={dailyMedication} onChange={setDailyMedication} maxLength={1000} rows={2} />
@@ -1600,6 +1788,7 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
           odontogramType={odontogramType}
           initialPieceNumbers={modalState.pieces}
           editingItem={modalState.editing}
+          initialFace={modalState.initialFace}
           diagnosisCatalog={diagnosisCatalog}
           onClose={() => setModalState(null)}
           onSave={handleSaveToothRecordItem}
@@ -1612,15 +1801,17 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
 }
 
 // ════════════════════════════════════════════════════════════════
-// MAIN VIEW #2 — MedicalHistoryDetailView (§4.11)
+// MAIN VIEW #2 — MedicalHistoryDetailView
 // ════════════════════════════════════════════════════════════════
 export interface MedicalHistoryDetailViewProps {
   patientId: number;
   medicalHistoryId: number;
-  /** "Paciente sin/con alergias registradas" — ya resuelto en otro lado, se pasa por prop
-      para no duplicar el cálculo del banner global del paciente. */
+  /** "Paciente sin/con alergias registradas" — ya resuelto en otro lado, se
+      pasa por prop para no duplicar el cálculo del banner global del
+      paciente. */
   allergyBannerState?: "present" | "absent" | "none";
-  /** Mensaje de error de un examen que falló al subirse tras la creación (§8 #11). */
+  /** Mensaje de error de un examen que falló al subirse tras la creación
+      (§8 #11). */
   examUploadError?: string | null;
   onNavigateToPatientHistorial: () => void;
 }
@@ -1694,44 +1885,78 @@ export function MedicalHistoryDetailView({
   const [error, setError] = useState<string | null>(null);
   const [dismissedExamError, setDismissedExamError] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    apiClient
-      .get<MedicalHistoryDetailResponse>(`/api/medical-histories/${patientId}/${medicalHistoryId}`)
-      .then((res) => {
-        if (!cancelled) setDetail(res.data);
-      })
-      .catch(() => {
-        if (!cancelled) setError("No se pudo cargar el detalle de la historia clínica.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+ useEffect(() => {
+  let cancelled = false;
+
+  setLoading(true);
+  setError(null);
+
+  apiClient
+    .get<MedicalHistoryDetailResponse>(
+      `/api/medical-histories/${patientId}/${medicalHistoryId}`
+    )
+    .then((res) => {
+      if (cancelled) return;
+
+      setDetail({
+        ...res.data,
+        toothRecords: res.data.toothRecords ?? [],
+        allergies: res.data.allergies ?? [],
+        complementaryExams: res.data.complementaryExams ?? [],
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId, medicalHistoryId]);
+    })
+    .catch((err: unknown) => {
+      if (cancelled) return;
+
+      console.error("Error cargando historia clínica:", err);
+
+      setError(
+        "No se pudo cargar el detalle de la historia clínica."
+      );
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [patientId, medicalHistoryId]);
 
   const grids = useMemo(() => (detail ? buildGrids(detail.odontogramType) : []), [detail]);
 
+  // Igual que en la vista de creación: Map<pieza, registros[]> para poder
+  // mostrar más de un registro por pieza (ej. una obturación en distal y una
+  // caries en incisal sobre el mismo diente).
   const itemsByPiece = useMemo(() => {
-    const map = new Map<number, LocalToothRecordItem>();
-    detail?.toothRecords.forEach((tr) => {
-      if (!tr.diagnosisType) return;
-      map.set(tr.pieceNumber, {
-        tempId: String(tr.id),
-        pieceNumbers: [tr.pieceNumber],
-        recordType: tr.recordType as RecordType,
-        face: tr.face as ToothFace,
-        diagnosisId: tr.diagnosisType.id,
-        diagnosisName: tr.diagnosisType.name,
-        diagnosisSymbol: tr.diagnosisType.symbol,
-        observations: tr.observations,
-      });
-    });
-    return map;
-  }, [detail]);
+  const map = new Map<number, LocalToothRecordItem[]>();
+
+  const toothRecords = detail?.toothRecords ?? [];
+
+  toothRecords.forEach((tr) => {
+    if (!tr.diagnosis) return;
+
+    const item: LocalToothRecordItem = {
+      tempId: String(tr.id),
+      pieceNumbers: [tr.pieceNumber],
+      recordType: tr.recordType as RecordType,
+      face: tr.toothFace as ToothFace,
+      diagnosisId: tr.diagnosis.id,
+      diagnosisName: tr.diagnosis.name,
+      diagnosisSymbol: tr.diagnosis.symbol,
+      observations: tr.observations,
+    };
+
+    const currentItems = map.get(tr.pieceNumber) ?? [];
+
+    currentItems.push(item);
+    map.set(tr.pieceNumber, currentItems);
+  });
+
+  return map;
+}, [detail]);
 
   if (loading) {
     return <div style={{ padding: 48, fontFamily: FONT_SANS, color: C.textMuted }}>Cargando historia clínica…</div>;
@@ -1752,7 +1977,7 @@ export function MedicalHistoryDetailView({
         <ExamUploadErrorBanner message={examUploadError} onDismiss={() => setDismissedExamError(true)} />
       )}
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 36px 60px" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 36px 60px" }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
           <AllergyBannerSmall state={allergyBannerState} />
         </div>
@@ -1788,16 +2013,27 @@ export function MedicalHistoryDetailView({
             </button>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 20px", fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, borderBottom: `1px solid ${C.border}` }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "10px 20px",
+              fontFamily: FONT_SANS,
+              fontSize: 12,
+              color: C.textMuted,
+              borderBottom: `1px solid ${C.border}`,
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
             <span>
-              Creado por: {fullNameOf(detail.dentist)} | {formatDateDisplay(detail.createdAt.slice(0, 10))}{" "}
-              {detail.createdAt.slice(11, 16)} hs
+              Creado por: {fullNameOf(detail.dentist)} |{" "}
+              {formatDateDisplay(detail.startDate)}
             </span>
-            {/* §8 #12: si editedBy es null, no se muestra nada (ni el label). */}
+
             {editedByName && (
               <span>
-                Editado por: {editedByName} | {formatDateDisplay(detail.updatedAt.slice(0, 10))}{" "}
-                {detail.updatedAt.slice(11, 16)} hs
+                Editado por: {editedByName}
               </span>
             )}
           </div>
@@ -1821,41 +2057,86 @@ export function MedicalHistoryDetailView({
               </div>
             </div>
 
-            {grids.map((g) => (
-              <OdontogramGridView key={g.key} grid={g} itemsByPiece={itemsByPiece} onPieceClick={() => {}} />
-            ))}
+            <div style={{ overflowX: "auto" }}>
+              {grids.map((g) => (
+                <OdontogramGridView
+                  key={g.key}
+                  grid={g}
+                  itemsByPiece={itemsByPiece}
+                  onPieceClick={() => {}}
+                  isReadOnly
+                />
+              ))}
+              {/* Misma leyenda única que en el formulario de creación, sin
+                  importar cuántas grillas se muestren. */}
+              <FaceLegend />
+            </div>
 
             <div style={{ marginTop: 4 }}>
-              <div style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em", padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
-                REGISTROS
+              <div style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em", padding: "8px 0", borderTop: `1px solid ${C.border}` }}>
+                REGISTROS ({detail.toothRecords.length})
               </div>
               {detail.toothRecords.length === 0 && (
-                <div style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.textMuted, fontStyle: "italic", padding: "6px 0" }}>
+                <div style={{ padding: "12px 4px", fontFamily: FONT_SANS, fontSize: 12.5, color: C.textMuted, fontStyle: "italic" }}>
                   Sin registros.
                 </div>
               )}
               {detail.toothRecords.map((tr) => (
-                <div key={tr.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <div>
-                    <div style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary }}>
-                      {formatDateDisplay(tr.createdAt.slice(0, 10))} | <strong>{formatPiece(tr.pieceNumber)}</strong> |{" "}
-                      {tr.diagnosisType?.name ?? "—"}
+                <div key={tr.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 4px", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 600, color: C.textMuted, flexShrink: 0, whiteSpace: "nowrap" }}>
+                        {formatDateDisplay(tr.createdAt.slice(0, 10))}
+                      </span>
+                      <span style={{ color: C.textMuted, flexShrink: 0, fontSize: 12 }}>·</span>
+                      <span style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, color: C.textPrimary, flexShrink: 0 }}>
+                        {formatPiece(tr.pieceNumber)}
+                      </span>
+                      <span style={{ color: C.textMuted, flexShrink: 0, fontSize: 12 }}>·</span>
+                      <span
+  style={{
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "1px 7px",
+    borderRadius: 5,
+    background:
+      (FACE_COLOR[tr.toothFace as ToothFace] ?? C.infoBg) + "55",
+    border: `1px solid ${
+      FACE_COLOR[tr.toothFace as ToothFace] ?? C.border
+    }99`,
+    fontFamily: FONT_SANS,
+    fontSize: 11,
+    fontWeight: 600,
+    color: C.textPrimary,
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  }}
+>
+  {FACE_LABEL[tr.toothFace as ToothFace] ?? tr.toothFace}
+</span>
+
+<span
+  style={{
+    fontFamily: FONT_SANS,
+    fontSize: 13,
+    color: C.textPrimary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }}
+>
+  {tr.diagnosis?.name ?? "Sin diagnóstico"}
+</span>
                     </div>
-                    {tr.observations && (
-                      <div style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, marginTop: 2 }}>{tr.observations}</div>
-                    )}
+                    <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: tr.recordType === "PRE_EXISTING" ? C.preExisting : C.required, flexShrink: 0 }}>
+                      {tr.recordType === "PRE_EXISTING" ? "PREEXISTENTE ●" : "REQUERIDA ●"}
+                    </span>
                   </div>
-                  <span
-                    style={{
-                      fontFamily: FONT_SANS,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                      color: tr.recordType === "PRE_EXISTING" ? C.preExisting : C.required,
-                    }}
-                  >
-                    {tr.recordType === "PRE_EXISTING" ? "PREEXISTENTE ●" : "REQUERIDA ●"}
-                  </span>
+                  {tr.observations && (
+                    <div style={{ padding: "0 4px 8px 4px", fontFamily: FONT_SANS, fontSize: 12, color: C.textSecondary, lineHeight: 1.45 }}>
+                      {tr.observations}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1903,44 +2184,91 @@ export function MedicalHistoryDetailView({
               )}
             </div>
 
-            {/* §8 #10: Exámenes complementarios y Medicación diaria SÍ se muestran
-                en el detalle si tienen datos cargados; se omiten si están vacíos
-                (igual comportamiento que "Editado por" con editedBy == null). */}
-            {detail.exams.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
-                  Exámenes complementarios
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {detail.exams.map((ex) => (
-                    <a
-                      key={ex.id}
-                      href={ex.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "8px 12px",
-                        background: C.infoBg,
-                        border: `1px solid ${C.infoBorder}`,
-                        borderRadius: 6,
-                        fontFamily: FONT_SANS,
-                        fontSize: 12.5,
-                        color: C.electric,
-                        textDecoration: "none",
-                      }}
-                    >
-                      <span>{ex.filename}</span>
-                      <span style={{ color: C.textMuted, fontSize: 11 }}>
-                        {ex.uploadBy ? `${ex.uploadBy.name} ${ex.uploadBy.lastName}` : ""}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* §8 #10: Exámenes complementarios y Medicación diaria SÍ se
+                muestran en el detalle si tienen datos cargados; se omiten si
+                están vacíos (igual comportamiento que "Editado por" con
+                editedBy == null). */}
+          {detail.complementaryExams.length > 0 && (
+  <div style={{ marginTop: 16 }}>
+    <div
+      style={{
+        fontFamily: FONT_SANS,
+        fontSize: 12,
+        color: C.textMuted,
+        marginBottom: 6,
+      }}
+    >
+      Exámenes complementarios
+    </div>
+
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {detail.complementaryExams.map((exam) => (
+        <div
+          key={exam.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 12px",
+            background: C.infoBg,
+            border: `1px solid ${C.infoBorder}`,
+            borderRadius: 6,
+            fontFamily: FONT_SANS,
+            fontSize: 12.5,
+            color: C.textPrimary,
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 600,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {exam.filename}
+            </span>
+
+            <span
+              style={{
+                color: C.textMuted,
+                fontSize: 11,
+              }}
+            >
+              {formatDateDisplay(exam.uploadDate?.slice(0, 10))}
+            </span>
+          </div>
+
+          <span
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              flexShrink: 0,
+            }}
+          >
+            {exam.uploadBy
+              ? `${exam.uploadBy.name} ${exam.uploadBy.lastName}`
+              : ""}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
             {detail.dailyMedication && (
               <div style={{ marginTop: 16 }}>
