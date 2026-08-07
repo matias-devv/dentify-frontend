@@ -71,7 +71,7 @@ import apiClient from "../../api/apiClient";
 // ════════════════════════════════════════════════════════════════
 // DESIGN TOKENS
 // ════════════════════════════════════════════════════════════════
-const C = {
+export const C = {
   navy: "#0F2244",
   electric: "#2563EB",
   bg: "#F4F5F7",
@@ -99,7 +99,7 @@ const C = {
   required: "#2563EB",
 } as const;
 
-const FONT_SANS = "'DM Sans', sans-serif";
+export const FONT_SANS = "'DM Sans', sans-serif";
 
 // ════════════════════════════════════════════════════════════════
 // TYPES
@@ -269,12 +269,12 @@ const SHORT_GLYPH: Record<DiagnosisSymbol, string> = {
   INLAY_ONLAY: "|", REMOVABLE_PROSTHESIS: "☐", IMPLANT: "I", CUSTOM: "◆",
 };
 
-const FACE_LABEL: Record<ToothFace, string> = {
+export const FACE_LABEL: Record<ToothFace, string> = {
   VESTIBULAR: "Vestibular", PALATAL: "Palatino", DISTAL: "Distal",
   MESIAL: "Mesial", INCISAL: "Incisal", WHOLE_TOOTH: "Todo el diente",
 };
 
-const FACE_COLOR: Record<ToothFace, string> = {
+export const FACE_COLOR: Record<ToothFace, string> = {
   VESTIBULAR: "#7DD3FC", PALATAL: "#F9A8D4", DISTAL: "#FCA5A5",
   MESIAL: "#6EE7B7", INCISAL: "#C4B5FD", WHOLE_TOOTH: "#FDE68A",
 };
@@ -302,7 +302,7 @@ interface OdontogramGrid {
   bottomRight: number[];
 }
 
-function buildGrids(type: OdontogramType): OdontogramGrid[] {
+export function buildGrids(type: OdontogramType): OdontogramGrid[] {
   const adult: OdontogramGrid = {
     key: "adult",
     label: "Adulto",
@@ -335,11 +335,11 @@ function validPieceNumbersFor(type: OdontogramType): Set<number> {
 // ════════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════════
-const formatPiece = (n: number): string => `${Math.floor(n / 10)}.${n % 10}`;
+export const formatPiece = (n: number): string => `${Math.floor(n / 10)}.${n % 10}`;
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
 const genTempId = (): string => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-const formatDateDisplay = (iso: string | null | undefined): string => {
+export const formatDateDisplay = (iso: string | null | undefined): string => {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
@@ -521,7 +521,7 @@ function ToothSVG({
       }}
       title={formatPiece(piece)}
     >
-      <svg width={36} height={36} viewBox="0 0 40 40" overflow="visible">
+      <svg width={42} height={42} viewBox="0 0 40 40" overflow="visible">
         <defs>
           {OUTER_PETALS.map(vp => (
             <clipPath key={vp} id={`${pid}-${vp}`}>
@@ -636,7 +636,7 @@ function ToothSVG({
 // ════════════════════════════════════════════════════════════════
 // ODONTOGRAMA — grilla + leyenda (leyenda extraída, ver FaceLegend)
 // ════════════════════════════════════════════════════════════════
-function OdontogramGridView({
+export function OdontogramGridView({
   grid, itemsByPiece, onPieceClick, isReadOnly,
 }: {
   grid: OdontogramGrid;
@@ -665,7 +665,7 @@ function OdontogramGridView({
   );
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 8 }}>
       {grid.label && (
         <div style={{
           fontFamily: FONT_SANS, fontSize: 10.5, fontWeight: 700,
@@ -675,9 +675,9 @@ function OdontogramGridView({
           {grid.label}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {renderRow(grid.topLeft, grid.topRight)}
-        <div style={{ height: 1, background: C.border }} />
+        <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
         {renderRow(grid.bottomLeft, grid.bottomRight)}
       </div>
       {/* Nota: la leyenda de colores por cara ya NO se renderiza acá adentro.
@@ -688,11 +688,11 @@ function OdontogramGridView({
   );
 }
 
-function FaceLegend() {
+export function FaceLegend() {
   return (
     <div style={{
-      display: "flex", flexWrap: "wrap", gap: "6px 14px",
-      marginTop: 2, marginBottom: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`,
+      display: "flex", flexWrap: "wrap", gap: "4px 10px",
+      marginTop: 6, marginBottom: 14, paddingTop: 6, borderTop: `1px solid ${C.border}`,
     }}>
       {(Object.entries(FACE_LABEL) as [ToothFace, string][]).map(([face, label]) => (
         <div key={face} style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -852,7 +852,7 @@ function RegistrosList({
 // ════════════════════════════════════════════════════════════════
 // PRIMITIVAS DE UI COMPARTIDAS
 // ════════════════════════════════════════════════════════════════
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+export function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <label style={{
       display: "block", fontFamily: FONT_SANS, fontSize: 12.5,
@@ -864,14 +864,14 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
   );
 }
 
-const inputBaseStyle: React.CSSProperties = {
+export const inputBaseStyle: React.CSSProperties = {
   width: "100%", padding: "9px 12px",
   border: `1.5px solid ${C.border}`, borderRadius: 8,
   fontFamily: FONT_SANS, fontSize: 13, color: C.textPrimary,
   background: C.cardBg, outline: "none", boxSizing: "border-box",
 };
 
-function TextArea({ value, onChange, placeholder, rows = 4, maxLength }: {
+export function TextArea({ value, onChange, placeholder, rows = 4, maxLength }: {
   value: string; onChange: (v: string) => void;
   placeholder?: string; rows?: number; maxLength?: number;
 }) {
@@ -884,7 +884,7 @@ function TextArea({ value, onChange, placeholder, rows = 4, maxLength }: {
   );
 }
 
-function PrimaryButton({ children, onClick, disabled, variant = "primary" }: {
+export function PrimaryButton({ children, onClick, disabled, variant = "primary" }: {
   children: React.ReactNode; onClick?: () => void;
   disabled?: boolean; variant?: "primary" | "secondary" | "danger";
 }) {
@@ -933,7 +933,7 @@ const REFERENCE_ROWS: Array<{ glyph: string; label: string }> = [
   { glyph: "IM",  label: "Implante" },
 ];
 
-function ModalShell({ title, onClose, children, width = 520 }: {
+export function ModalShell({ title, onClose, children, width = 520 }: {
   title: string; onClose: () => void; children: React.ReactNode; width?: number;
 }) {
   return (
@@ -966,7 +966,7 @@ function ModalShell({ title, onClose, children, width = 520 }: {
   );
 }
 
-function ReferenciasModal({ onClose }: { onClose: () => void }) {
+export function ReferenciasModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalShell title="Referencias Odontograma" onClose={onClose} width={560}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px" }}>
@@ -1806,6 +1806,7 @@ export function MedicalHistoryCreateView({ userProfile, patientId, onCreated, on
 export interface MedicalHistoryDetailViewProps {
   patientId: number;
   medicalHistoryId: number;
+  onEdit?: () => void;
   /** "Paciente sin/con alergias registradas" — ya resuelto en otro lado, se
       pasa por prop para no duplicar el cálculo del banner global del
       paciente. */
@@ -1876,6 +1877,7 @@ function ExamUploadErrorBanner({ message, onDismiss }: { message: string; onDism
 export function MedicalHistoryDetailView({
   patientId,
   medicalHistoryId,
+  onEdit,
   allergyBannerState = "none",
   examUploadError,
   onNavigateToPatientHistorial,
@@ -1983,19 +1985,50 @@ export function MedicalHistoryDetailView({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={{ display: "flex", gap: 10 }}>
-            <span
-              title="Editar (fuera de alcance de esta especificación)"
-              style={{ width: 34, height: 34, borderRadius: 7, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textMuted, opacity: 0.5 }}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={onEdit}
+              disabled={!onEdit}
+              title={onEdit ? "Editar historia clínica" : "Editar (no disponible)"}
+              aria-label="Editar"
+              style={{
+                background: "#F3F4F6",
+                border: "1px solid #D1D5DB",
+                borderRadius: "6px",
+                padding: "6px 12px",
+                fontSize: "16px",
+                lineHeight: 1,
+                cursor: onEdit ? "pointer" : "not-allowed",
+                opacity: onEdit ? 1 : 0.6,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                transition: "background 0.15s",
+                color: "#374151",
+              }}
+              onMouseEnter={onEdit ? (e) => (e.currentTarget.style.background = "#E5E7EB") : undefined}
+              onMouseLeave={onEdit ? (e) => (e.currentTarget.style.background = "#F3F4F6") : undefined}
             >
               ✎
-            </span>
-            <span
-              title="Imprimir (fuera de alcance de esta especificación)"
-              style={{ width: 34, height: 34, borderRadius: 7, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: C.textMuted, opacity: 0.5 }}
+            </button>
+            <button
+              title="Imprimir (no disponible en esta versión)"
+              aria-label="Imprimir"
+              style={{
+                background: "#F3F4F6",
+                border: "1px solid #D1D5DB",
+                borderRadius: "6px",
+                padding: "6px 12px",
+                fontSize: "16px",
+                lineHeight: 1,
+                cursor: "pointer",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                transition: "background 0.15s",
+                color: "#374151",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#E5E7EB")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#F3F4F6")}
             >
               🖨
-            </span>
+            </button>
           </div>
         </div>
 
@@ -2038,7 +2071,7 @@ export function MedicalHistoryDetailView({
             )}
           </div>
 
-          <div style={{ padding: 20 }}>
+          <div style={{ padding: "12px 16px" }}>
             <h4 style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, color: C.textPrimary, marginTop: 0 }}>
               Evolución general
             </h4>
@@ -2283,4 +2316,4 @@ export function MedicalHistoryDetailView({
       </div>
     </div>
   );
-}
+} ;
