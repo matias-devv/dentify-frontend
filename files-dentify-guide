@@ -1,0 +1,99 @@
+ > .agents
+.agents
+
+dentify-frontend
+│
+├─ dist
+├─ node_modules
+├─ src
+│
+│   ├─ api
+│   │   ├─ apiClient.js
+|   |   ├─ authError.js
+│   │   ├─ authService.js
+│   │   └─ dashboardService.js
+|   |    └─ login.js 
+|   |
+|   ├─ pages    
+|   |   ├─ agendas
+|   |   │   └─ AgendasViews.tsx
+|   │   │
+|   │   ├─ auth
+|   |   |   ├─ invitation
+|   |   |   │   ├─ DentistRegistration.jsx
+|   |   |   │   └─ SecretaryRegistration.jsx
+|   |   |   |
+|   │   │   └─ login
+|   │   │   |   └─  Login.jsx 
+|   |   |   |  
+|   │   │   └─ AuthContext.jsx
+|   │   │   └─ useAuth.js
+|   │   │   └─ ProtectedRoute.jsx
+|   │   │   └─ RoleProtectedRoute.jsx 
+|   │   │   └─ Unauthorized.jsx 
+|   │   │   └─ useAuth.js 
+|   │   │ 
+|   │   │
+|   │   ├─ dashboard
+|   │   │   └─ DashboardHome.tsx
+|   │   │
+|   │   |─ dentist
+|   │   │   └─ DentistLayout.tsx   
+|   │   |   
+|   │   |─ medicalHistory
+|   │   │   └─ medicalHistory.types.ts   
+|   |   |   └─ medicalHistoryEditViews.tsx  
+|   |   |   └─ medicalHistoryFormViews.tsx 
+|   |   |   └─ medicalHistoryViews.tsx   
+|   │   |   
+|   │   |─ patients
+|   │   │   └─ CreatePatientViews.tsx 
+|   |   |   └─ PatientViews.tsx 
+|   │   │ 
+|   │   |─ payments
+|   │   │   |─ ui
+|   │   │   |  |─ app
+|   │   │   |  |─ styles    
+|   |   |   |  └─ IncomeChart.tsx 
+|   |   |   |
+|   |   |   └─ PaymentSummary.jsx 
+|   |   |   └─ PaymentsViews.tsx   
+|   │   |   
+|   │   |─ products
+|   │   │   └─ ProductCreateView.tsx
+|   |   |   └─ ProductViews.tsx   
+|   │   |   
+|   │   |─ sidebar
+|   │   │   └─ dentify-sidebar.tsx 
+|   │   |   
+|   │   |─ turnos
+|   │   │   └─ AdmisionView.tsx
+|   |   |   └─ CrearTurnoView.tsx  
+|   |   |   └─ TurnoDetailView.tsx 
+|   |   |   └─ TurnosViews.tsx   
+|   │   |
+|   │   ├─ App.css
+|   │   ├─ App.jsx 
+|   │   ├─ home.jsx
+|   │   ├─ main.jsx 
+│
+├─ .gitignore
+├─ eslint.config.js
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.js
+├─ README.md
+├─ tailwind.config.js
+├─ vite.config.js 
+├─ js
+|   ├─  api
+|     └─ dashboardService.js
+|   ├─  pages
+|     └─ login.js
+├─ files-dentify-guide
+
+
+
+ 
+
