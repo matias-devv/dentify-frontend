@@ -716,14 +716,17 @@ function adaptPaymentToModal(payment: Payment): PaymentTodayResponse {
 
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 
+// CHANGE 1: Added onDownloadReceipt prop to the drawer interface
 function PaymentDetailDrawer({
   paymentId,
   onClose,
   onConfirmSuccess,
+  onDownloadReceipt,
 }: {
   paymentId: string;
   onClose: () => void;
   onConfirmSuccess: () => void;
+  onDownloadReceipt: (id: string) => void;
 }) {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -1052,7 +1055,9 @@ function PaymentDetailDrawer({
               </button>
             )}
             {payment && payment.hasReceipt && (
+              // CHANGE 2: Added onClick to the drawer download button
               <button
+                onClick={() => payment && onDownloadReceipt(payment.id)}
                 style={{
                   width: '100%',
                   backgroundColor: 'transparent',
@@ -1239,6 +1244,30 @@ export function PaymentsView() {
     if (confirmLoading) return;
     setModalPayment(null);
     setConfirmError(null);
+  }
+
+  // CHANGE 3: handleDownloadReceipt function
+  async function handleDownloadReceipt(paymentId: string): Promise<void> {
+    try {
+      const response = await api.get<{
+        receiptId: number;
+        filename: string;
+        downloadUrl: string;
+      }>(`/api/payments/receipt/download/${Number(paymentId)}`);
+
+      const { downloadUrl } = response.data;
+      window.open(downloadUrl, '_blank');
+
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        alert('El comprobante no está disponible para este pago.');
+      } else if (error.response?.status === 403) {
+        alert('No tienes permisos para descargar este comprobante.');
+      } else if (error.response?.status !== 401) {
+        alert('Error al descargar el comprobante. Intentá nuevamente.');
+      }
+      console.error('Error downloading receipt:', error);
+    }
   }
 
   const hasFilters    = filterStatus || filterMethod || filterFrom || filterTo;
@@ -1462,8 +1491,12 @@ export function PaymentsView() {
                       {/* Comprobante */}
                       <td style={{ padding: '0 16px', textAlign: 'center' }}>
                         {payment.hasReceipt ? (
+                          // CHANGE 4: Added handleDownloadReceipt call to the table download button
                           <button
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadReceipt(payment.id);
+                            }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'inline-flex' }}
                           >
                             <Download size={15} color="#1A6FD4" strokeWidth={1.5} />
@@ -1546,10 +1579,12 @@ export function PaymentsView() {
 
       {/* Drawer */}
       {selectedId && (
+        // CHANGE 5: Pass handleDownloadReceipt to the drawer
         <PaymentDetailDrawer
           paymentId={selectedId}
           onClose={() => setSelectedId(null)}
           onConfirmSuccess={() => fetchPayments(page)}
+          onDownloadReceipt={handleDownloadReceipt}
         />
       )}
 
