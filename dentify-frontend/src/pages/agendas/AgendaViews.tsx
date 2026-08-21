@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import React from "react";
-import { useNavigate } from "react-router-dom";   // ← FIX 1: import useNavigate
+import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/apiClient";
- 
+
 // ════════════════════════════════════════════════════════════════
-// DESIGN TOKENS (mirror del Dashboard)
+// DESIGN TOKENS (tomados del diseño de Figma)
 // ════════════════════════════════════════════════════════════════
 const C = {
   navy:          "#0F2244",
@@ -16,11 +16,14 @@ const C = {
   textPrimary:   "#111827",
   textSecondary: "#6B7280",
   textMuted:     "#9CA3AF",
+  green:         "#10B981",
+  red:           "#EF4444",
 };
-const FONT_SANS = "'DM Sans', sans-serif";
+const FONT_SANS  = "'DM Sans', sans-serif";
+const FONT_SERIF = "'Playfair Display', Georgia, serif";
 
 // ════════════════════════════════════════════════════════════════
-// TYPES
+// TYPES (sin cambios respecto al código real)
 // ════════════════════════════════════════════════════════════════
 interface UserProfile {
   id?: number;
@@ -37,7 +40,6 @@ interface ScheduleSummary {
   days:      string[];
 }
 
-// ── ACTUALIZADO: refleja exactamente el DTO del backend ──
 interface AgendaListItem {
   id:              number;
   agendaName:      string;
@@ -73,22 +75,21 @@ interface CreateAgendaRequest {
 interface DentistOption { id: number; name: string; surname: string; }
 interface ProductOption  { id: number; nameProduct: string; }
 
-// ── FIX 1 + FIX 2: onNavigate opcional; userProfile añadido a AgendaListView ──
 interface AgendaListViewProps {
-  onNavigate?:  (id: string) => void;   // ← ahora opcional
-  userProfile?: UserProfile | null;     // ← FIX 2: necesario para elegir endpoint
+  onNavigate?:  (id: string) => void;
+  userProfile?: UserProfile | null;
 }
 
-interface AgendaCreateViewProps { 
-  onNavigate?:  (id: string) => void;   // ← ahora opcional
-  userProfile?: { 
+interface AgendaCreateViewProps {
+  onNavigate?:  (id: string) => void;
+  userProfile?: {
     id?: number;
-    name: string; 
-    surname: string; 
-    clinicName: string; 
-    clinicId?: number; 
-    roles: string[]; 
-  } | null; 
+    name: string;
+    surname: string;
+    clinicName: string;
+    clinicId?: number;
+    roles: string[];
+  } | null;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -140,7 +141,6 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-// Formatea fecha ISO a dd/mm/aa usando toLocaleDateString es-AR
 function formatDateShort(iso: string): string {
   if (!iso) return "—";
   const [year, month, day] = iso.split("-");
@@ -150,6 +150,12 @@ function formatDateShort(iso: string): string {
     month: "2-digit",
     year:  "2-digit",
   });
+}
+
+function getInitials(name?: string, surname?: string): string {
+  const n = (name?.trim()?.[0] ?? "").toUpperCase();
+  const s = (surname?.trim()?.[0] ?? "").toUpperCase();
+  return `${n}${s}` || "—";
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -212,19 +218,41 @@ function InputBase(props: React.InputHTMLAttributes<HTMLInputElement> & { error?
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+// Tarjeta de sección estilo Figma: eyebrow "PASO N" + título serif
+function SectionCard({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <h3 style={{
-      fontFamily: FONT_SANS,
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: "0.1em",
-      textTransform: "uppercase",
-      color: C.textMuted,
-      marginBottom: 16,
+    <div style={{
+      background: C.cardBg,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "28px 32px",
+      marginBottom: 24,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
     }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{
+          fontFamily: FONT_SANS,
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: C.electric,
+          marginBottom: 4,
+        }}>
+          {eyebrow}
+        </div>
+        <h3 style={{
+          fontFamily: FONT_SERIF,
+          fontSize: 18,
+          fontWeight: 600,
+          color: C.textPrimary,
+          margin: 0,
+        }}>
+          {title}
+        </h3>
+      </div>
       {children}
-    </h3>
+    </div>
   );
 }
 
@@ -250,20 +278,10 @@ const IcPlus = () => (
     <path d="M7 2v10M2 7h10"/>
   </svg>
 );
-const IcChevronLeft = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 3L5 8l5 5"/>
-  </svg>
-);
 const IcAlert = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M8 2L1.5 14h13L8 2z"/>
     <path d="M8 7v3M8 12v.5"/>
-  </svg>
-);
-const IcCheck = () => (
-  <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 const IcSpinner = () => (
@@ -277,6 +295,103 @@ const IcSpinner = () => (
     flexShrink: 0,
   }} />
 );
+
+// ════════════════════════════════════════════════════════════════
+// PAGE HEADER (Figma) — eyebrow + título serif + subtítulo
+// ════════════════════════════════════════════════════════════════
+function PageHeader({
+  eyebrow, title, subtitle,
+}: { eyebrow: string; title: string; subtitle?: string }) {
+  return (
+    <div>
+      <div style={{
+        fontFamily: FONT_SANS,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        color: C.electric,
+        marginBottom: 6,
+      }}>
+        {eyebrow}
+      </div>
+      <h1 style={{
+        fontFamily: FONT_SERIF,
+        fontSize: 34,
+        fontWeight: 700,
+        color: C.textPrimary,
+        margin: 0,
+        lineHeight: 1.1,
+        letterSpacing: "-0.01em",
+      }}>
+        {title}
+      </h1>
+      {subtitle && (
+        <div style={{
+          fontFamily: FONT_SANS,
+          fontSize: 13,
+          color: C.textSecondary,
+          marginTop: 6,
+        }}>
+          {subtitle}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// USER INFO BLOCK — reemplaza al Topbar; se reubica junto al PageHeader
+// ════════════════════════════════════════════════════════════════
+function UserInfoBlock({ userProfile }: { userProfile?: UserProfile | null }) {
+  const fullName = userProfile
+    ? `${userProfile.name} ${userProfile.surname}`.trim()
+    : "";
+  const clinicName = userProfile?.clinicName ?? "";
+  const initials = getInitials(userProfile?.name, userProfile?.surname);
+
+  if (!userProfile) return null;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+          {fullName}
+        </div>
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textSecondary }}>
+          {clinicName}
+        </div>
+      </div>
+      <div style={{
+        width: 36, height: 36, borderRadius: "50%",
+        background: C.electric, color: "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700,
+        flexShrink: 0,
+      }}>
+        {initials}
+      </div>
+    </div>
+  );
+}
+
+// Fila superior compartida: PageHeader a la izquierda, info de usuario a la derecha
+function ViewHeaderRow({
+  eyebrow, title, subtitle, userProfile,
+}: { eyebrow: string; title: string; subtitle?: string; userProfile?: UserProfile | null }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 24,
+      marginBottom: 32,
+    }}>
+      <PageHeader eyebrow={eyebrow} title={title} subtitle={subtitle} />
+      <UserInfoBlock userProfile={userProfile} />
+    </div>
+  );
+}
 
 // ════════════════════════════════════════════════════════════════
 // EMPTY STATE
@@ -309,6 +424,33 @@ function AgendaEmptyState({ text }: { text: string }) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// GRID — 7 columnas. Se agrega paddingLeft extra en "Nombre" para
+// separarla visualmente de "Estado" sin tocar el resto de columnas.
+// ════════════════════════════════════════════════════════════════
+const GRID_COLS = "40px 1fr 160px 120px 240px 210px 80px";
+const NAME_COL_EXTRA_GAP = 16; // px de aire extra entre "Estado" y "Nombre"
+
+// ════════════════════════════════════════════════════════════════
+// STATUS BADGE — sin punto de color, solo texto sobre pill
+// ════════════════════════════════════════════════════════════════
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span style={{
+      fontFamily: FONT_SANS,
+      fontSize: 11,
+      fontWeight: 600,
+      color: active ? "#059669" : "#DC2626",
+      background: active ? "#ECFDF5" : "#FEF2F2",
+      padding: "2px 10px",
+      borderRadius: 20,
+      whiteSpace: "nowrap",
+    }}>
+      {active ? "Activa" : "Inactiva"}
+    </span>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
 // SKELETON ROWS — actualizado para 7 columnas
 // ════════════════════════════════════════════════════════════════
 function SkeletonRows() {
@@ -318,18 +460,18 @@ function SkeletonRows() {
       {[0, 1, 2].map((i) => (
         <div key={i} style={{
           display: "grid",
-          gridTemplateColumns: "40px 1fr 180px 110px 240px 210px 80px", 
+          gridTemplateColumns: GRID_COLS,
           columnGap: 20,
-          alignItems: "center", 
+          alignItems: "center",
           padding: "13px 20px",
           borderBottom: `1px solid ${C.border}`,
         }}>
           {/* Estado */}
           <div style={{ display: "flex", justifyContent: "center" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", ...pulse }} />
+            <div style={{ width: 34, height: 16, borderRadius: 20, ...pulse }} />
           </div>
           {/* Nombre */}
-          <div style={{ width: [160, 200, 140][i], height: 12, ...pulse }} />
+          <div style={{ paddingLeft: NAME_COL_EXTRA_GAP, width: [160, 200, 140][i], height: 12, ...pulse }} />
           {/* Profesional */}
           <div style={{ width: 120, height: 12, ...pulse }} />
           {/* Duración */}
@@ -352,7 +494,7 @@ function SkeletonRows() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// STATUS FILTER PILLS — sin cambios
+// STATUS FILTER PILLS
 // ════════════════════════════════════════════════════════════════
 type FilterStatus = "all" | "active" | "inactive";
 
@@ -396,15 +538,12 @@ function FilterPills({ value, onChange }: {
 }
 
 // ════════════════════════════════════════════════════════════════
-// AGENDA ROW — rediseñado con 7 columnas
+// AGENDA ROW — 7 columnas, StatusBadge sin dot
 // ════════════════════════════════════════════════════════════════
 interface AgendaRowProps {
   item:     AgendaListItem;
   onDelete: (id: number) => void;
 }
-
-// Layout compartido con el header de columnas
-const GRID_COLS = "40px 1fr 160px 120px 240px 210px 80px";
 
 function AgendaRow({ item, onDelete }: AgendaRowProps) {
   const [hover,          setHover]          = useState(false);
@@ -435,7 +574,7 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
           display: "grid",
           gridTemplateColumns: GRID_COLS,
           columnGap: 20,
-          alignItems: "center", 
+          alignItems: "center",
           padding: "13px 20px",
           background: hover ? "#FAFBFC" : "transparent",
           transition: "background 0.12s",
@@ -444,24 +583,14 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
           position: "relative",
         }}
       >
-        {/* ── Col 1: Estado (punto de color) ── */}
+        {/* ── Col 1: Estado (badge sin dot) ── */}
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <span
-            aria-label={item.active ? "Activo" : "Inactivo"}
-            title={item.active ? "Activo" : "Inactivo"}
-            style={{
-              display: "inline-block",
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: item.active ? "#10B981" : "#EF4444",
-              flexShrink: 0,
-            }}
-          />
+          <StatusBadge active={item.active} />
         </div>
 
-        {/* ── Col 2: Nombre de la agenda ── */}
+        {/* ── Col 2: Nombre de la agenda (con aire extra respecto a Estado) ── */}
         <span style={{
+          paddingLeft: NAME_COL_EXTRA_GAP,
           fontFamily: FONT_SANS,
           fontSize: 13,
           fontWeight: 600,
@@ -486,7 +615,7 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
           {item.dentistFullName}
         </span>
 
-        {/* ── Col 4: Duración (centrado, fuente tabular) ── */}
+        {/* ── Col 4: Duración ── */}
         <span style={{
           fontFamily: FONT_SANS,
           fontSize: 12,
@@ -531,7 +660,6 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
           justifyContent: "center",
           gap: 8,
         }}>
-          {/* Editar */}
           <button
             aria-label="Editar agenda"
             title="Editar (próximamente)"
@@ -553,7 +681,6 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
             <IcPencil />
           </button>
 
-          {/* Eliminar */}
           <button
             aria-label="Eliminar agenda"
             onClick={() => { setConfirmVisible((v) => !v); setDeleteError(null); }}
@@ -576,7 +703,6 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
         </div>
       </div>
 
-      {/* Confirm inline — sin cambios de comportamiento */}
       {confirmVisible && (
         <div style={{
           margin: "0 20px 12px",
@@ -642,7 +768,6 @@ function AgendaRow({ item, onDelete }: AgendaRowProps) {
         </div>
       )}
 
-      {/* Row divider */}
       <div style={{ height: 1, background: "#F3F4F6" }} />
     </>
   );
@@ -658,7 +783,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
   const [searchQuery,  setSearchQuery]  = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
-  // ── FIX 1: navegación híbrida ──
   const navigate = useNavigate();
   const handleNavigate = useCallback((section: string) => {
     if (onNavigate) { onNavigate(section); return; }
@@ -671,7 +795,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
     if (route) navigate(route);
   }, [onNavigate, navigate]);
 
-  // ── FIX 2: endpoint según rol ──
   const isSecretary = userProfile?.roles?.includes("SECRETARY") ?? false;
   const endpoint = isSecretary
     ? "/api/agendas/find/by-clinic"
@@ -684,7 +807,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
       const res = await apiClient.get(endpoint);
       const raw: any[] = Array.isArray(res.data) ? res.data : [];
 
-      // ── Mapeo alineado con el record CreateAgendaResponse ──
       const mapped: AgendaListItem[] = raw.map((item) => ({
         id:              item.id_agenda,
         agendaName:      item.agenda_name,
@@ -702,7 +824,7 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);  // re-fetch si cambia el endpoint (cambio de rol, improbable pero correcto)
+  }, [endpoint]);
 
   useEffect(() => { fetchAgendas(); }, [fetchAgendas]);
 
@@ -721,7 +843,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
     return matchesSearch && matchesStatus;
   });
 
-  // Estilo compartido para labels de columna
   const colHeaderStyle: React.CSSProperties = {
     fontFamily: FONT_SANS,
     fontSize: 9.5,
@@ -733,6 +854,16 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
 
   return (
     <>
+      <style>{`@keyframes agendaSpin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── HEADER: PageHeader + info de usuario (reemplaza Topbar/breadcrumb) ── */}
+      <ViewHeaderRow
+        eyebrow="MÓDULO AGENDAS"
+        title="Mis agendas"
+        subtitle={`${agendas.length} agenda${agendas.length === 1 ? "" : "s"} registrada${agendas.length === 1 ? "" : "s"}${userProfile?.clinicName ? ` · ${userProfile.clinicName}` : ""}`}
+        userProfile={userProfile}
+      />
+
       {/* ── TOOLBAR ── */}
       <div style={{
         display: "flex",
@@ -741,7 +872,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
         marginBottom: 24,
         flexWrap: "wrap",
       }}>
-        {/* + Agenda — usa handleNavigate en vez de onNavigate directamente */}
         <button
           onClick={() => handleNavigate("agendas-create")}
           style={{
@@ -759,12 +889,12 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
             cursor: "pointer",
             whiteSpace: "nowrap",
             flexShrink: 0,
+            boxShadow: "0 1px 3px rgba(15,34,68,0.2)",
           }}
         >
           <IcPlus /> Agenda
         </button>
 
-        {/* Search */}
         <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
           <span style={{
             position: "absolute",
@@ -799,7 +929,6 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
           />
         </div>
 
-        {/* Filter pills */}
         <FilterPills value={filterStatus} onChange={setFilterStatus} />
       </div>
 
@@ -809,44 +938,30 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
         border: `1px solid ${C.border}`,
         borderRadius: 10,
         overflow: "hidden",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
       }}>
-        {/* ── HEADER DE COLUMNAS — 7 columnas ── */}
         <div style={{
           display: "grid",
           gridTemplateColumns: GRID_COLS,
           columnGap: 20,
-          alignItems: "center", 
+          alignItems: "center",
           padding: "10px 20px",
           background: "#FAFBFC",
           borderBottom: `1px solid ${C.border}`,
         }}>
-          {/* Estado */}
           <div style={{ display: "flex", justifyContent: "center" }}>
             <span style={colHeaderStyle}>St.</span>
           </div>
-
-          {/* Nombre */}
-          <span style={colHeaderStyle}>Nombre</span>
-
-          {/* Profesional */}
+          <span style={{ ...colHeaderStyle, paddingLeft: NAME_COL_EXTRA_GAP }}>Nombre</span>
           <span style={colHeaderStyle}>Profesional</span>
-
-          {/* Duración */}
           <span style={colHeaderStyle}>Duración</span>
-
-          {/* Producto */}
           <span style={colHeaderStyle}>Producto</span>
-
-          {/* Vigencia */}
           <span style={colHeaderStyle}>Vigencia</span>
-
-          {/* Acciones */}
           <div style={{ display: "flex", justifyContent: "center" }}>
             <span style={colHeaderStyle}>Acc.</span>
           </div>
         </div>
 
-        {/* ── CONTENT ── */}
         {loading ? (
           <SkeletonRows />
         ) : error ? (
@@ -882,6 +997,18 @@ export function AgendaListView({ onNavigate, userProfile }: AgendaListViewProps)
           filtered.map((a) => (
             <AgendaRow key={a.id} item={a} onDelete={handleDelete} />
           ))
+        )}
+
+        {!loading && !error && filtered.length > 0 && (
+          <div style={{
+            padding: "10px 20px",
+            borderTop: `1px solid ${C.border}`,
+            fontFamily: FONT_SANS,
+            fontSize: 11.5,
+            color: C.textMuted,
+          }}>
+            Mostrando {filtered.length} de {agendas.length} agendas
+          </div>
         )}
       </div>
     </>
@@ -925,7 +1052,6 @@ function ScheduleBlockEditor({
       padding: "20px 24px",
       marginBottom: 16,
     }}>
-      {/* Header del bloque */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -969,18 +1095,16 @@ function ScheduleBlockEditor({
         )}
       </div>
 
-      {/* FILA HORIZONTAL PRINCIPAL */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "minmax(0, 1.8fr) 1fr 1fr auto",
         gap: 20,
         alignItems: "flex-end",
       }}>
-        {/* Columna 1: Días de atención */}
         <div style={{ minWidth: 0 }}>
           <FieldLabel text="Días de atención" required />
-          <div style={{ 
-            display: "flex", 
+          <div style={{
+            display: "flex",
             gap: 6,
             flexWrap: "nowrap",
           }}>
@@ -1018,7 +1142,6 @@ function ScheduleBlockEditor({
           <FieldError msg={errors.days} />
         </div>
 
-        {/* Columna 2: Hora inicio */}
         <div style={{ minWidth: 0 }}>
           <FieldLabel text="Hora inicio" required />
           <InputBase
@@ -1031,7 +1154,6 @@ function ScheduleBlockEditor({
           <FieldError msg={errors.startTime} />
         </div>
 
-        {/* Columna 3: Hora fin */}
         <div style={{ minWidth: 0 }}>
           <FieldLabel text="Hora fin" required />
           <InputBase
@@ -1044,7 +1166,6 @@ function ScheduleBlockEditor({
           <FieldError msg={errors.endTime} />
         </div>
 
-        {/* Columna 4: vacía */}
         <div />
       </div>
     </div>
@@ -1078,7 +1199,6 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
   const isSecretary = userProfile?.roles?.includes("SECRETARY") ?? false;
   const [active, setActive] = useState<boolean>(true);
 
-  // ── FIX 1: navegación híbrida ──
   const navigate = useNavigate();
   const handleNavigate = useCallback((section: string) => {
     if (onNavigate) { onNavigate(section); return; }
@@ -1206,7 +1326,7 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
 
     try {
       await apiClient.post("/api/agendas/save", payload);
-      handleNavigate("agendas-list");  // ← usa handleNavigate en vez de onNavigate
+      handleNavigate("agendas-list");
     } catch (err: any) {
       const data = err?.response?.data;
       const code = data?.code as string | undefined;
@@ -1237,16 +1357,16 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
 
       <div style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 48px 80px" }}>
 
-        {/* ── SECCIÓN 1: DATOS GENERALES ── */}
-        <div style={{
-          background: C.cardBg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          padding: "28px 32px",
-          marginBottom: 24,
-        }}>
-          <SectionTitle>Datos generales</SectionTitle>
+        {/* ── HEADER: PageHeader + info de usuario (reemplaza Topbar/breadcrumb) ── */}
+        <ViewHeaderRow
+          eyebrow="MÓDULO AGENDAS"
+          title="Nueva agenda"
+          subtitle="Completá los datos para registrar una nueva agenda de atención"
+          userProfile={userProfile}
+        />
 
+        {/* ── SECCIÓN 1: DATOS GENERALES ── */}
+        <SectionCard eyebrow="PASO 1" title="Datos generales">
           <div style={{ marginBottom: 24 }}>
             <FieldLabel text="Nombre de la agenda" required />
             <InputBase
@@ -1386,11 +1506,11 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
                     onClick={() => setActive(value)}
                     type="button"
                     style={{
-                      padding: "8px 16px",
+                      padding: "8px 20px",
                       borderRadius: 7,
-                      border: `1.5px solid ${isSelected ? C.navyMid : C.border}`,
-                      background: isSelected ? C.navyMid : "#FFFFFF",
-                      color: isSelected ? "#FFFFFF" : C.textSecondary,
+                      border: `1.5px solid ${isSelected ? (value ? "#059669" : "#DC2626") : C.border}`,
+                      background: isSelected ? (value ? "#ECFDF5" : "#FEF2F2") : "#FFFFFF",
+                      color: isSelected ? (value ? "#059669" : "#DC2626") : C.textSecondary,
                       fontFamily: FONT_SANS,
                       fontSize: 13,
                       fontWeight: 600,
@@ -1406,17 +1526,10 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
             </div>
             <FieldError msg={errors.active} />
           </div>
-        </div>
+        </SectionCard>
 
         {/* ── SECCIÓN 2: VIGENCIA ── */}
-        <div style={{
-          background: C.cardBg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          padding: "28px 32px",
-          marginBottom: 24,
-        }}>
-          <SectionTitle>Vigencia</SectionTitle>
+        <SectionCard eyebrow="PASO 2" title="Vigencia">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
               <FieldLabel text="Fecha de inicio" required />
@@ -1449,28 +1562,20 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
               <FieldError msg={errors.finalDate} />
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         {/* ── SECCIÓN 3: HORARIOS ── */}
-        <div style={{
-          background: C.cardBg,
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          padding: "28px 32px",
-          marginBottom: 24,
-        }}>
-          <div style={{ marginBottom: 20 }}>
-            <SectionTitle>Bloques horarios</SectionTitle>
-            <p style={{
-              fontFamily: FONT_SANS,
-              fontSize: 13,
-              color: C.textSecondary,
-              marginTop: -8,
-              lineHeight: 1.5,
-            }}>
-              Definí uno o más bloques de atención con sus días y horarios.
-            </p>
-          </div>
+        <SectionCard eyebrow="PASO 3" title="Bloques horarios">
+          <p style={{
+            fontFamily: FONT_SANS,
+            fontSize: 13,
+            color: C.textSecondary,
+            marginTop: -8,
+            marginBottom: 20,
+            lineHeight: 1.5,
+          }}>
+            Definí uno o más bloques de atención con sus días y horarios.
+          </p>
 
           {errors.schedules && (
             <div style={{
@@ -1518,7 +1623,7 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
           >
             <IcPlus /> Agregar bloque horario
           </button>
-        </div>
+        </SectionCard>
 
         {/* ── SUBMIT ERROR BANNER ── */}
         {submitError && (
@@ -1554,7 +1659,7 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
           paddingTop: 16,
         }}>
           <button
-            onClick={() => handleNavigate("agendas-list")}   // ← usa handleNavigate
+            onClick={() => handleNavigate("agendas-list")}
             disabled={isLoading}
             style={{
               padding: "11px 24px",
@@ -1588,6 +1693,7 @@ export function AgendaCreateView({ onNavigate, userProfile }: AgendaCreateViewPr
               gap: 8,
               opacity: isLoading ? 0.75 : 1,
               transition: "opacity 0.15s",
+              boxShadow: "0 1px 3px rgba(15,34,68,0.25)",
             }}
           >
             {isLoading ? <><IcSpinner /> Creando...</> : <>Crear agenda →</>}
