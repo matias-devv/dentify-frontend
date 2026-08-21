@@ -1,4 +1,11 @@
-import { useState, useMemo } from "react";
+// src/pages/dentist/ui/IncomeChart.tsx
+//
+// PERFORMANCE FIX: React.memo impide que el componente re-renderice cuando
+// el padre cambia por razones no relacionadas con el gráfico (ej: collapsed state
+// del sidebar, estados de loading, etc.). El gráfico solo se vuelve a renderizar
+// si `data` o `period` cambian realmente.
+
+import { memo, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -7,13 +14,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from "recharts"; 
 
 type Period = "Semana" | "Mes" | "Año";
 
-// 4-pointed concave sparkle star — path derived by rotating the top→right
-// cubic bezier segment 90° CW three times. Control factor c=0.28 produces
-// the tight inward concave sides matching the reference star shape.
+// 4-pointed concave sparkle star
 const makeStar = (cx: number, cy: number, R: number) => {
   const c = 0.28;
   const cr = c * R;
@@ -27,7 +32,15 @@ const makeStar = (cx: number, cy: number, R: number) => {
   ].join(" ");
 };
 
-const StarDot = ({ cx, cy, active }: { cx?: number; cy?: number; active?: boolean }) => {
+const StarDot = memo(function StarDot({
+  cx,
+  cy,
+  active,
+}: {
+  cx?: number;
+  cy?: number;
+  active?: boolean;
+}) {
   if (cx == null || cy == null) return null;
   const R = active ? 10 : 6;
   return (
@@ -38,14 +51,22 @@ const StarDot = ({ cx, cy, active }: { cx?: number; cy?: number; active?: boolea
       strokeWidth={active ? 2 : 0}
     />
   );
-};
+});
 
 const formatCurrency = (value: number) => {
   if (value === 0) return "$0";
   return "$" + value.toLocaleString("es-AR");
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = memo(function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 px-4 py-3">
@@ -55,19 +76,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       </p>
     </div>
   );
-};
+});
 
 interface IncomeChartProps {
-  data: any[];
+  data: Array<{ label?: string; date?: string; amount?: number; value?: number }>;
   period: "Semana" | "Mes" | "Año";
 }
 
-export default function IncomeChart({ data, period }: IncomeChartProps) {
-  // Mapear los datos de la API al formato esperado
+// ─────────────────────────────────────────────────────────────────────────────
+// React.memo: el componente solo se re-renderiza si data o period cambian.
+// Esto evita que el cambio de `collapsed` en DentistLayout (o cualquier
+// re-render del padre) fuerce a Recharts a recalcular el gráfico.
+// ─────────────────────────────────────────────────────────────────────────────
+function IncomeChart({ data, period }: IncomeChartProps) {
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    
-    return data.map((item: any) => ({
+    return data.map((item) => ({
       label: item.label || item.date || "",
       value: item.amount || item.value || 0,
     }));
@@ -75,10 +99,9 @@ export default function IncomeChart({ data, period }: IncomeChartProps) {
 
   const { yMax, yTicks } = useMemo(() => {
     if (chartData.length === 0) return { yMax: 1000, yTicks: [0, 250, 500, 750, 1000] };
-    
     const maxVal = Math.max(...chartData.map((d) => d.value));
     const step = period === "Año" ? 7500 : 4500;
-    const top = Math.ceil(maxVal / step) * step;
+    const top = Math.ceil(maxVal / step) * step || step;
     return {
       yMax: top,
       yTicks: [0, top / 4, top / 2, (top * 3) / 4, top],
@@ -97,11 +120,7 @@ export default function IncomeChart({ data, period }: IncomeChartProps) {
           </linearGradient>
         </defs>
 
-        <CartesianGrid
-          strokeDasharray="0"
-          stroke="#F1F3F5"
-          vertical={false}
-        />
+        <CartesianGrid strokeDasharray="0" stroke="#F1F3F5" vertical={false} />
 
         <XAxis
           dataKey="label"
@@ -126,13 +145,15 @@ export default function IncomeChart({ data, period }: IncomeChartProps) {
           cursor={{ stroke: "#E2E8F0", strokeWidth: 1 }}
         />
 
-        <Area
+        <Area 
           type="linear"
           dataKey="value"
           stroke="#2563EB"
           strokeWidth={1.5}
           fill="url(#blueGrad)"
-          dot={(props: any) => <StarDot cx={props.cx} cy={props.cy} />}
+          dot={(props: any) => (
+            <StarDot cx={props.cx} cy={props.cy} />
+          )}
           activeDot={(props: any) => (
             <StarDot cx={props.cx} cy={props.cy} active />
           )}
@@ -141,3 +162,7 @@ export default function IncomeChart({ data, period }: IncomeChartProps) {
     </ResponsiveContainer>
   );
 }
+
+// Export con memo — comparación shallow por defecto, suficiente ya que
+// data es un nuevo array solo cuando la API responde, y period es un string.
+export default memo(IncomeChart);
