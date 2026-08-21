@@ -5,6 +5,13 @@
 // Implementa Requirements.md — Vista "Historial Clínico" (listado) anidada en
 // Pacientes: RN-1..RN-5, validaciones §3, catálogo de errores §7,
 // criterios de aceptación §8.
+//
+// v2 — se agrega navegación al detalle: hacer click en una fila de la tabla
+// navega a `.../historia-clinica/{history.id}`, pasando `patient` por
+// `state` (mismo patrón que `handleEvolucionSelect`/`handleVolverAPacientes`
+// del wrapper de routing en App.jsx). MedicalHistoryDetailView siempre hace
+// su propio GET — no se pasa el objeto completo de la fila por `state`.
+//
 // TypeScript estricto · cero any · consistente con PatientViews.tsx
 // ════════════════════════════════════════════════════════════════════════════
 import React, {
@@ -14,6 +21,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import apiClient from "../../api/apiClient";
 import type {
   MedicalHistorySummaryResponse,
@@ -114,9 +122,10 @@ const initialsOf = (fullName: string): string => {
 
 const mapOdontogramType = (t: OdontogramType | string): string => {
   switch (t) {
-    case "ADULT": return "Adulto";
-    case "CHILD": return "Niño";
-    default:      return t;
+    case "ADULT":     return "Adulto";
+    case "PEDIATRIC": return "Infantil";
+    case "MIX":       return "Mixto";
+    default:          return t;
   }
 };
 
@@ -822,12 +831,20 @@ function Cell({ children, mono, truncate }: { children: React.ReactNode; mono?: 
   );
 }
 
-function HistoryRow({ history }: { history: MedicalHistorySummaryResponse }) {
+function HistoryRow({
+  history,
+  onClick,
+}: {
+  history: MedicalHistorySummaryResponse;
+  /** Navega al detalle de esta historia puntual (Problema 4b: listado → detalle). */
+  onClick: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const obs = formatObservations(history.observations);
 
   return (
     <div
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -839,6 +856,7 @@ function HistoryRow({ history }: { history: MedicalHistorySummaryResponse }) {
         background:          hovered ? C.activeItemBg : C.cardBg,
         borderBottom:        `1px solid ${C.border}`,
         transition:          "background 0.12s",
+        cursor:              "pointer",
       }}
     >
       <Cell>{formatDate(history.startDate)}</Cell>
@@ -876,6 +894,8 @@ export function HistorialClinicoView({
   onNavigate,
 }: HistorialClinicoViewProps) {
 
+  const navigate = useNavigate();
+
   // ── Fetch ──
   const { histories, loading, error, refetch } = useFetchMedicalHistories(patientId);
 
@@ -912,6 +932,21 @@ export function HistorialClinicoView({
       onNavigate(key, { patientId });
     },
     [onNavigate, patientId]
+  );
+
+  // ── Navegación al hacer click en una fila del listado (Problema 4b) ──
+  // Mismo patrón que handleEvolucionSelect/handleVolverAPacientes: navega
+  // por id y deja que MedicalHistoryDetailView haga siempre el mismo GET —
+  // no se pasa el objeto completo de la fila por `state`, solo el header
+  // del paciente (igual que hace MedicalHistoryCreateRouteWrapper.handleCreated
+  // en App.jsx).
+  const handleRowClick = useCallback(
+    (historyId: number) => {
+      navigate(`/dentist/dashboard/pacientes/${patientId}/historia-clinica/${historyId}`, {
+        state: { patient: patientHeader },
+      });
+    },
+    [navigate, patientId, patientHeader]
   );
 
   // ── Acción alternativa del ErrorState 404 ──
@@ -993,7 +1028,7 @@ export function HistorialClinicoView({
           >
             <TableHeader />
             {filtered.map((h) => (
-              <HistoryRow key={h.id} history={h} />
+              <HistoryRow key={h.id} history={h} onClick={() => handleRowClick(h.id)} />
             ))}
           </div>
         )}
