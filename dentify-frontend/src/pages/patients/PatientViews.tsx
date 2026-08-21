@@ -17,6 +17,7 @@ import apiClient from "../../api/apiClient";
 // ════════════════════════════════════════════════════════════════
 const C = {
   navy:           "#0F2244",
+  navyMid:        "#1A2B4A",
   electric:       "#2563EB",
   bg:             "#F4F5F7",
   cardBg:         "#FFFFFF",
@@ -34,7 +35,8 @@ const C = {
   successText:    "#166534",
 } as const;
 
-const FONT_SANS = "'DM Sans', sans-serif";
+const FONT_SANS  = "'DM Sans', sans-serif";
+const FONT_SERIF = "'Playfair Display', Georgia, serif";
 
 // ════════════════════════════════════════════════════════════════
 // TIPOS — PatientResponse (espejo del record Java del backend)
@@ -124,6 +126,10 @@ const calcAge = (dob: string | null | undefined): string => {
 const normalize = (s: string): string =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+/** Iniciales de nombre + apellido para el avatar del usuario logueado. */
+const getInitials = (name: string, surname: string): string =>
+  ((name[0] ?? "") + (surname[0] ?? "")).toUpperCase();
+
 // ════════════════════════════════════════════════════════════════
 // HOOK — useDebounce
 // ════════════════════════════════════════════════════════════════
@@ -188,13 +194,121 @@ function useFetchPatients(): UseFetchPatientsState {
 // MINI-COMPONENTS
 // ════════════════════════════════════════════════════════════════
 
+/**
+ * PageHeader — eyebrow + título editorial (Playfair Display) + subtítulo
+ * con el conteo real de pacientes, y a la derecha el bloque de usuario
+ * (nombre/apellido + clínica + avatar de iniciales) cuando userProfile
+ * está disponible.
+ */
 function PageHeader({
   totalCount,
+  userProfile,
+}: {
+  totalCount:  number;
+  userProfile: UserProfileShape | null;
+}) {
+  const initials = userProfile
+    ? getInitials(userProfile.name, userProfile.surname)
+    : "";
+
+  return (
+    <div
+      style={{
+        padding: "36px 36px 0",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 24,
+        flexWrap: "wrap",
+      }}
+    >
+      {/* Izquierda: eyebrow + título + subtítulo */}
+      <div>
+        <div
+          style={{
+            fontFamily:    FONT_SANS,
+            fontSize:      10,
+            fontWeight:    700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color:         C.electric,
+            marginBottom:  6,
+          }}
+        >
+          Módulo Pacientes
+        </div>
+        <h1
+          style={{
+            fontFamily:    FONT_SERIF,
+            fontSize:      34,
+            fontWeight:    700,
+            color:         C.textPrimary,
+            margin:        0,
+            lineHeight:    1.1,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Pacientes
+        </h1>
+        <div
+          style={{
+            fontFamily: FONT_SANS,
+            fontSize:   13,
+            color:      C.textSecondary,
+            marginTop:  7,
+          }}
+        >
+          {totalCount} {totalCount === 1 ? "paciente registrado" : "pacientes registrados"}
+          {userProfile?.clinicName ? ` · ${userProfile.clinicName}` : ""}
+        </div>
+      </div>
+
+      {/* Derecha: bloque de usuario — solo si hay datos disponibles */}
+      {userProfile && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, paddingTop: 4 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: FONT_SANS, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+              {userProfile.name} {userProfile.surname}
+            </div>
+            {userProfile.clinicName && (
+              <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.textSecondary }}>
+                {userProfile.clinicName}
+              </div>
+            )}
+          </div>
+          <div
+            style={{
+              width:  36,
+              height: 36,
+              borderRadius: "50%",
+              background:   C.electric,
+              color:        "#fff",
+              display:      "flex",
+              alignItems:   "center",
+              justifyContent: "center",
+              fontFamily:   FONT_SANS,
+              fontSize:     13,
+              fontWeight:   700,
+              flexShrink:   0,
+            }}
+          >
+            {initials}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Toolbar — fila con el botón "Nuevo paciente" y el buscador,
+ * separada del header como en el mockup.
+ */
+function Toolbar({
   searchQuery,
   onSearchChange,
   onNewPatient,
 }: {
-  totalCount:     number;
   searchQuery:    string;
   onSearchChange: (v: string) => void;
   onNewPatient?:  () => void;
@@ -204,68 +318,20 @@ function PageHeader({
   return (
     <div
       style={{
-        background:   C.cardBg,
-        borderBottom: `1px solid ${C.border}`,
-        padding:      "20px 36px",
-        display:      "flex",
-        alignItems:   "center",
-        gap:          16,
-        flexWrap:     "wrap",
+        padding: "24px 36px 0",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
       }}
     >
-      {/* Título */}
-      <div style={{ flex: "none" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            style={{
-              fontFamily:    FONT_SANS,
-              fontSize:      15,
-              fontWeight:    700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color:         C.textPrimary,
-            }}
-          >
-            Pacientes
-          </span>
-          {totalCount > 0 && (
-            <span
-              style={{
-                background:    C.activeItemBg,
-                color:         C.electric,
-                fontSize:      11,
-                fontWeight:    700,
-                borderRadius:  20,
-                padding:       "2px 10px",
-                fontFamily:    FONT_SANS,
-                border:        `1px solid rgba(37,99,235,0.2)`,
-              }}
-            >
-              {totalCount}
-            </span>
-          )}
-        </div>
-        <p
-          style={{
-            fontFamily: FONT_SANS,
-            fontSize:   12,
-            color:      C.textMuted,
-            margin:     "2px 0 0",
-          }}
-        >
-          Listado completo de pacientes registrados en la clínica
-        </p>
-      </div>
+      {onNewPatient && <NewPatientButton onClick={onNewPatient} />}
 
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
-
-      {/* Search */}
-      <div style={{ position: "relative", width: 280 }}>
+      <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 420 }}>
         <div
           style={{
             position:  "absolute",
-            left:      12,
+            left:      13,
             top:       "50%",
             transform: "translateY(-50%)",
             color:     focused ? C.electric : C.textMuted,
@@ -288,7 +354,7 @@ function PageHeader({
           onBlur={() => setFocused(false)}
           style={{
             width:        "100%",
-            padding:      "9px 12px 9px 36px",
+            padding:      "10px 36px 10px 38px",
             border:       `1.5px solid ${focused ? C.electric : C.border}`,
             borderRadius: 8,
             fontFamily:   FONT_SANS,
@@ -297,7 +363,7 @@ function PageHeader({
             background:   C.cardBg,
             outline:      "none",
             boxSizing:    "border-box",
-            transition:   "border-color 0.15s",
+            transition:   "border-color 0.15s, box-shadow 0.15s",
             boxShadow:    focused ? "0 0 0 3px rgba(37,99,235,0.10)" : "none",
           }}
         />
@@ -315,20 +381,15 @@ function PageHeader({
               cursor:    "pointer",
               color:     C.textMuted,
               display:   "flex",
-              padding:   0,
+              padding:   2,
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
               <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
         )}
       </div>
-
-      {/* Botón nuevo paciente — placeholder funcional */}
-      {onNewPatient && (
-        <NewPatientButton onClick={onNewPatient} />
-      )}
     </div>
   );
 }
@@ -341,13 +402,13 @@ function NewPatientButton({ onClick }: { onClick: () => void }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display:      "flex",
+        display:      "inline-flex",
         alignItems:   "center",
-        gap:          6,
-        padding:      "9px 18px",
+        gap:          7,
+        padding:      "10px 22px",
         borderRadius: 7,
         border:       "none",
-        background:   hovered ? "#1d4ed8" : C.electric,
+        background:   hovered ? C.navy : C.navyMid,
         color:        "#fff",
         fontFamily:   FONT_SANS,
         fontSize:     13,
@@ -355,9 +416,11 @@ function NewPatientButton({ onClick }: { onClick: () => void }) {
         cursor:       "pointer",
         transition:   "background 0.15s",
         flexShrink:   0,
+        whiteSpace:   "nowrap",
+        boxShadow:    "0 1px 3px rgba(15,34,68,0.18)",
       }}
     >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
         <path d="M7 2v10M2 7h10" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
       Nuevo paciente
@@ -517,8 +580,8 @@ function PatientRow({
         gridTemplateColumns: "2fr 1.2fr 1fr 1.3fr 1fr 1fr 40px",
         alignItems:     "center",
         gap:            16,
-        padding:        "14px 24px",
-        background:     hovered ? C.activeItemBg : C.cardBg,
+        padding:        "15px 24px",
+        background:     hovered ? "#F7F8FA" : C.cardBg,
         borderBottom:   `1px solid ${C.border}`,
         cursor:         "pointer",
         transition:     "background 0.12s",
@@ -575,7 +638,7 @@ function PatientRow({
         )}
       </div>
 
-      {/* Cobertura — badge */}
+      {/* Cobertura — badge tipo pill */}
       <div>
         <span
           style={{
@@ -583,9 +646,9 @@ function PatientRow({
             fontFamily:    FONT_SANS,
             fontSize:      11,
             fontWeight:    600,
-            borderRadius:  4,
-            padding:       "3px 8px",
-            letterSpacing: "0.02em",
+            borderRadius:  20,
+            padding:       "3px 10px",
+            letterSpacing: "0.01em",
             whiteSpace:    "nowrap",
           }}
         >
@@ -687,7 +750,7 @@ function TableHeader() {
 // MAIN VIEW — PacientesListView
 // ════════════════════════════════════════════════════════════════
 export function PacientesListView({
-  userProfile: _userProfile,
+  userProfile,
   onNavigate: _onNavigate,
 }: PacientesListViewProps) {
 
@@ -752,13 +815,19 @@ export function PacientesListView({
       }}
     >
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
         @keyframes dentify-spin     { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes dentify-shimmer  { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
       `}</style>
 
-      {/* ── Header con búsqueda ── */}
+      {/* ── Header editorial + bloque de usuario ── */}
       <PageHeader
         totalCount={loading ? 0 : filtered.length}
+        userProfile={userProfile}
+      />
+
+      {/* ── Toolbar: botón "Nuevo paciente" + búsqueda ── */}
+      <Toolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNewPatient={handleNewPatient}
