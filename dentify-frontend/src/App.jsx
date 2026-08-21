@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams, useOutletContext } from "react-router-dom";
 
+import { useAuth } from "./pages/auth/useAuth";
 import Login                  from "./pages/auth/login/Login";
 import DentistRegistration    from "./pages/auth/invitation/DentistRegistration";
 import SecretaryRegistration  from "./pages/auth/invitation/SecretaryRegistration";
@@ -19,6 +20,8 @@ import { CrearTurnoView }                            from "./pages/turnos/CrearT
 import { TurnoDetailView }                           from "./pages/turnos/TurnoDetailView";
 import { PacientesListView }                         from "./pages/patients/PatientViews";
 import { HistorialClinicoView } from "./pages/medicalHistory/MedicalHistoryViews";
+import { MedicalHistoryCreateView, MedicalHistoryDetailView } from "./pages/medicalHistory/MedicalHistoryFormViews";
+import { MedicalHistoryEditView }                    from "./pages/medicalHistory/MedicalHistoryEditViews";
 import { ProductsView }                              from "./pages/products/ProductView";
 import {
   getSelectedSlotContext,
@@ -164,6 +167,127 @@ function HistorialClinicoRouteWrapper() {
   );
 }
 
+// ─── Wrapper para MedicalHistoryCreateView ───────────────────────────────────
+function MedicalHistoryCreateRouteWrapper() {
+  const ctx          = useOutletContext() ?? {};
+  const userProfile  = ctx.userProfile ?? null;
+    const { user }      = useAuth();  
+  const { patientId } = useParams();
+  const navigate      = useNavigate();
+  const location       = useLocation();
+
+  const parsedId = patientId ? parseInt(patientId, 10) : null;
+  if (!parsedId || Number.isNaN(parsedId)) {
+    return <Navigate to="/dentist/dashboard/pacientes" replace />;
+  }
+
+  // §4.11 / §8 #11: al crear con éxito (incluso si falló la subida de algún
+  // examen) se redirige al detalle, arrastrando el header del paciente y el
+  // error de examen (si lo hubo) vía location.state.
+  const handleCreated = (medicalHistoryId, examUploadError) => {
+    navigate(
+      `/dentist/dashboard/pacientes/${parsedId}/historia-clinica/${medicalHistoryId}`,
+      {
+        replace: true,
+        state: {
+          patient: location.state?.patient ?? null,
+          examUploadError: examUploadError ?? null,
+        },
+      }
+    );
+  };
+
+  // §8 #18: "Cancelar" descarta los datos y redirige al listado de
+  // historiales de ese paciente.
+  const handleCancel = () => {
+    navigate(`/dentist/dashboard/pacientes/${parsedId}/historial`, {
+      state: { patient: location.state?.patient ?? null },
+    });
+  };
+
+  return (
+    <MedicalHistoryCreateView
+      userProfile={userProfile}
+      patientId={parsedId}
+      onCreated={handleCreated}
+      onCancel={handleCancel}
+      roles={user?.roles ?? []}
+    />
+  );
+}
+
+// ─── Wrapper para MedicalHistoryDetailView ───────────────────────────────────
+function MedicalHistoryDetailRouteWrapper() {
+  const { patientId, medicalHistoryId } = useParams();
+  const navigate = useNavigate();
+  const location  = useLocation();
+  const { user } = useAuth();
+
+  const parsedPatientId = patientId ? parseInt(patientId, 10) : null;
+  const parsedHistoryId = medicalHistoryId ? parseInt(medicalHistoryId, 10) : null;
+  const canEdit = user?.roles?.includes("ROLE_DENTIST");
+
+  if (!parsedPatientId || Number.isNaN(parsedPatientId) || !parsedHistoryId || Number.isNaN(parsedHistoryId)) {
+    return <Navigate to="/dentist/dashboard/pacientes" replace />;
+  }
+
+  const handleNavigateToPatientHistorial = () => {
+    navigate(`/dentist/dashboard/pacientes/${parsedPatientId}/historial`, {
+      state: { patient: location.state?.patient ?? null },
+    });
+  };
+
+  const handleEdit = () => {
+    if (!canEdit) return;
+    navigate(`/dentist/dashboard/pacientes/${parsedPatientId}/historia-clinica/${parsedHistoryId}/editar`, {
+      state: { patient: location.state?.patient ?? null },
+    });
+  };
+
+  return (
+    <MedicalHistoryDetailView
+      patientId={parsedPatientId}
+      medicalHistoryId={parsedHistoryId}
+      examUploadError={location.state?.examUploadError ?? null}
+      onNavigateToPatientHistorial={handleNavigateToPatientHistorial}
+      onEdit={canEdit ? handleEdit : undefined}
+    />
+  );
+}
+
+// ─── Wrapper para MedicalHistoryEditView ─────────────────────────────────────
+function MedicalHistoryEditRouteWrapper() {
+  const { patientId, medicalHistoryId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+
+  const parsedPatientId = patientId ? parseInt(patientId, 10) : null;
+  const parsedHistoryId = medicalHistoryId ? parseInt(medicalHistoryId, 10) : null;
+  const roles = user?.roles ?? [];
+
+  if (!parsedPatientId || Number.isNaN(parsedPatientId) || !parsedHistoryId || Number.isNaN(parsedHistoryId)) {
+    return <Navigate to="/dentist/dashboard/pacientes" replace />;
+  }
+
+  const handleReturnToDetail = () => {
+    navigate(`/dentist/dashboard/pacientes/${parsedPatientId}/historia-clinica/${parsedHistoryId}`, {
+      replace: true,
+      state: { patient: location.state?.patient ?? null },
+    });
+  };
+
+  return (
+    <MedicalHistoryEditView
+      patientId={parsedPatientId}
+      medicalHistoryId={parsedHistoryId}
+      roles={roles}
+      onSaveSuccess={handleReturnToDetail}
+      onCancel={handleReturnToDetail}
+    />
+  );
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
@@ -200,10 +324,18 @@ export default function App() {
             <Route
               path="dashboard/pacientes/:patientId/historial"
               element={<HistorialClinicoRouteWrapper />}
-            />
+            /> 
             <Route
               path="dashboard/pacientes/:patientId/historia-clinica/nueva"
-              element={<PlaceholderView label="Historia Clínica General" />}
+              element={<MedicalHistoryCreateRouteWrapper />}
+            />
+            <Route
+              path="dashboard/pacientes/:patientId/historia-clinica/:medicalHistoryId"
+              element={<MedicalHistoryDetailRouteWrapper />}
+            />
+            <Route
+              path="dashboard/pacientes/:patientId/historia-clinica/:medicalHistoryId/editar"
+              element={<MedicalHistoryEditRouteWrapper />}
             />
 
             <Route path="dashboard/agendas"       element={<WithUserProfile Component={AgendaListView} />} />

@@ -116,16 +116,26 @@ apiClient.interceptors.request.use(
     }
 
     /*
-     * WHY withCredentials per-request for /auth/* paths:
-     * The refreshToken cookie has path=/auth — the browser only sends it
-     * to URLs under /auth. We set withCredentials on all /auth calls so
-     * login, refresh, and logout all properly send/receive cookies.
-     *
-     * We intentionally do NOT set withCredentials globally on apiClient:
-     * that would instruct the browser to send ALL cookies (including session
-     * cookies for other origins) on every API call — a security concern
-     * if the app ever proxies to third-party APIs.
+     * WHY: apiClient tiene Content-Type: application/json fijado como
+     * default de instancia (ver axios.create() más arriba). Axios solo
+     * genera automáticamente el "multipart/form-data; boundary=..."
+     * correcto cuando el Content-Type NO fue seteado explícitamente antes.
+     * Como acá sí lo seteamos como default, axios lo respeta para TODA
+     * request — incluidas las que llevan FormData (uploads de archivos) —
+     * y termina mandando "Content-Type: application/json" con un body
+     * multipart. El backend lo rechaza con HttpMediaTypeNotSupportedException
+     * antes de llegar al controller, y el archivo nunca se sube.
+     * Por eso, si el body es FormData, hay que borrar el header acá para
+     * que el navegador lo complete solo con el boundary correcto.
      */
+    if (config.data instanceof FormData) {
+      if (typeof config.headers?.delete === "function") {
+        config.headers.delete("Content-Type"); // AxiosHeaders (axios v1.x)
+      } else if (config.headers) {
+        delete config.headers["Content-Type"]; // objeto plano (versiones previas)
+      }
+    }
+
     if (config.url?.startsWith("/auth")) {
       config.withCredentials = true;
     }
